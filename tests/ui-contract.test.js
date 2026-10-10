@@ -11,6 +11,7 @@ const helper = fs.readFileSync(path.join(root, "mouse-control"), "utf8")
 
 test("manifest identifies the owned left-bar widget", () => {
   assert.equal(manifest.id, "io.github.ol4vr.mouse-control")
+  assert.equal(manifest.version, "0.2.4")
   assert.equal(manifest.barWidget.defaultSection, "left")
   assert.deepEqual(manifest.kinds, ["bar-widget"])
 })
@@ -43,22 +44,27 @@ test("popup presents the persisted warning threshold as compact status", () => {
   assert.doesNotMatch(panel, /Critical notification/)
 })
 
-test("popup keeps balanced content insets and selected-device emphasis", () => {
+test("popup keeps balanced content insets and a neutral selected-device heading", () => {
   assert.match(panel, /anchors\.leftMargin: Style\.space\(16\)/)
   assert.match(panel, /anchors\.rightMargin: Style\.space\(16\)/)
   assert.match(panel, /SELECTED DEVICE/)
-  assert.match(panel, /height: selectedDeviceContent\.implicitHeight \+ Style\.space\(24\)/)
-  assert.match(panel, /text: "SELECTED DEVICE"\s+color: root\.foreground/)
-  assert.match(panel, /root\.activeDevice\.name : "Mouse unavailable"\s+color: Color\.accent/)
+  assert.match(panel, /id: selectedDeviceSection[\s\S]*text: "SELECTED DEVICE"/)
+  assert.match(panel, /root\.activeDevice\.name : "Mouse unavailable"[\s\S]*color: root\.foreground/)
+  assert.doesNotMatch(panel, /color: Qt\.rgba\(Color\.accent\.r/)
 })
 
-test("popup accents the selected DPI and presents explicit device telemetry", () => {
+test("popup uses equal neutral metric cards and compact device status", () => {
   assert.match(panel, /foreground: selected \? Color\.accent/)
   assert.match(panel, /bordered: selected/)
-  assert.match(panel, /text: "󰍽"[\s\S]*id: selectedDpi[\s\S]*Model\.dpiText\(root\.activeDevice\)/)
-  assert.match(panel, /text: "󰁹"[\s\S]*text: "Battery"[\s\S]*id: selectedBattery/)
-  assert.match(panel, /id: selectedBattery[\s\S]*batteryWarning\(root\.activeDevice, root\.warningThreshold\)[\s\S]*\? Color\.urgent/)
-  assert.match(panel, /id: selectedCharging[\s\S]*"Charging status unavailable"[\s\S]*"Charging" : "Not charging"/)
+  assert.match(panel, /id: dpiCard[\s\S]*width: \(deviceMetrics\.width - deviceMetrics\.spacing\) \/ 2/)
+  assert.match(panel, /id: batteryCard[\s\S]*width: \(deviceMetrics\.width - deviceMetrics\.spacing\) \/ 2/)
+  assert.match(panel, /id: batteryCard[\s\S]*height: dpiCard\.height[\s\S]*color: dpiCard\.color/)
+  assert.match(panel, /id: selectedDpiValue[\s\S]*root\.activeDevice\.dpi[\s\S]*Style\.font\.display/)
+  assert.match(panel, /id: selectedBatteryValue[\s\S]*root\.activeDevice\.battery[\s\S]*batteryWarning\(root\.activeDevice, root\.warningThreshold\)[\s\S]*\? Color\.urgent : root\.foreground/)
+  assert.match(panel, /id: chargingStatus[\s\S]*root\.chargingText\(root\.activeDevice\)/)
+  assert.match(panel, /id: connectionStatus[\s\S]*root\.connectionTypeText\(root\.activeDevice\)/)
+  assert.match(panel, /return device\.charging \? "Charging" : "Not charging"/)
+  assert.doesNotMatch(panel, /Model\.connectionText\(root\.activeDevice\)/)
   assert.match(panel, /id: warningValue[\s\S]*color: root\.foreground/)
 })
 

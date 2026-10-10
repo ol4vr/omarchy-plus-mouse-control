@@ -53,6 +53,19 @@ Panel {
       hostWidget.runAction(["set-dpi", activeDevice.id, String(value)])
   }
 
+  function chargingText(device) {
+    if (!device || device.charging === null) return "Unavailable"
+    return device.charging ? "Charging" : "Not charging"
+  }
+
+  function connectionTypeText(device) {
+    if (!device || !device.connected) return "Disconnected"
+    if (!device.available) return "Control unavailable"
+    if (device.connection === "hyperspeed") return "HyperSpeed"
+    if (device.connection === "lightspeed") return "LIGHTSPEED"
+    return device.connection !== "unavailable" ? device.connection : "Connected"
+  }
+
   KeyboardPanel {
     id: panel
     anchorItem: root.anchorItem
@@ -89,25 +102,13 @@ Panel {
             font.pixelSize: Style.font.heading
           }
 
-          Column {
+          Text {
             anchors.verticalCenter: parent.verticalCenter
-            spacing: Style.space(2)
-
-            Text {
-              text: "Mouse Control"
-              color: Color.popups.text
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.subtitle
-              font.bold: true
-            }
-
-            Text {
-              text: root.activeDevice ? Model.connectionText(root.activeDevice) : "Loading…"
-              color: root.activeDevice && root.activeDevice.connected
-                ? root.foreground : Color.urgent
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.caption
-            }
+            text: "Mouse Control"
+            color: Color.popups.text
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.subtitle
+            font.bold: true
           }
         }
 
@@ -136,109 +137,177 @@ Panel {
           foreground: root.foreground
         }
 
-        Rectangle {
+        Column {
+          id: selectedDeviceSection
           width: parent.width
-          height: selectedDeviceContent.implicitHeight + Style.space(24)
-          radius: Style.cornerRadius
-          color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.06)
-          border.width: 1
-          border.color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.24)
+          spacing: Style.space(10)
 
-          Column {
-            id: selectedDeviceContent
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            anchors.leftMargin: Style.space(12)
-            anchors.rightMargin: Style.space(12)
-            spacing: Style.space(4)
+          Row {
+            spacing: Style.space(8)
 
             Text {
-              text: "SELECTED DEVICE"
-              color: root.foreground
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.caption
-              font.bold: true
-            }
-
-            Text {
-              width: parent.width
-              text: root.activeDevice ? root.activeDevice.name : "Mouse unavailable"
-              color: Color.accent
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.body
-              font.bold: true
-              elide: Text.ElideRight
-            }
-
-            Row {
-              spacing: Style.space(8)
-
-              Text {
-                text: "󰍽"
-                color: Color.accent
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.body
-              }
-
-              Text {
-                id: selectedDpi
-                text: Model.dpiText(root.activeDevice)
-                color: Color.popups.text
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.body
-                font.bold: true
-              }
-            }
-
-            Row {
-              spacing: Style.space(4)
-
-              Text {
-                text: "󰁹"
-                color: root.foreground
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.body
-              }
-
-              Text {
-                text: "Battery"
-                color: Color.popups.text
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.body
-                font.bold: true
-              }
-
-              Text {
-                id: selectedBattery
-                text: root.activeDevice && root.activeDevice.battery !== null
-                  ? root.activeDevice.battery + "%" : "unavailable"
-                color: Model.batteryWarning(root.activeDevice, root.warningThreshold)
-                  ? Color.urgent : Color.popups.text
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.body
-                font.bold: true
-              }
-            }
-
-            Text {
-              id: selectedCharging
-              text: !root.activeDevice || root.activeDevice.charging === null
-                ? "Charging status unavailable"
-                : root.activeDevice.charging ? "Charging" : "Not charging"
-              color: root.foreground
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.bodySmall
-            }
-
-            Text {
-              visible: root.activeDevice && root.activeDevice.preferredDpi !== null
-              text: "Preferred: "
-                + (root.activeDevice ? root.activeDevice.preferredDpi : "—") + " DPI"
+              anchors.verticalCenter: parent.verticalCenter
+              text: "󰍽"
               color: Qt.rgba(root.foreground.r, root.foreground.g,
                 root.foreground.b, 0.62)
               font.family: root.fontFamily
-              font.pixelSize: Style.font.caption
+              font.pixelSize: Style.font.title
+            }
+
+            Column {
+              spacing: Style.space(2)
+
+              Text {
+                text: "SELECTED DEVICE"
+                color: Qt.rgba(root.foreground.r, root.foreground.g,
+                  root.foreground.b, 0.62)
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+                font.letterSpacing: 0.7
+              }
+
+              Text {
+                text: root.activeDevice ? root.activeDevice.name : "Mouse unavailable"
+                color: root.foreground
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.heading
+                font.bold: true
+              }
+            }
+          }
+
+          Row {
+            id: deviceMetrics
+            width: parent.width
+            spacing: Style.space(8)
+
+            Rectangle {
+              id: dpiCard
+              width: (deviceMetrics.width - deviceMetrics.spacing) / 2
+              height: Style.space(72)
+              radius: Math.min(8, Style.cornerRadius)
+              color: Qt.rgba(root.foreground.r, root.foreground.g,
+                root.foreground.b, 0.05)
+
+              Column {
+                anchors.fill: parent
+                anchors.margins: Style.space(10)
+                spacing: Style.space(3)
+
+                Text {
+                  text: "DPI"
+                  color: Qt.rgba(root.foreground.r, root.foreground.g,
+                    root.foreground.b, 0.62)
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.caption
+                  font.letterSpacing: 0.7
+                }
+
+                Row {
+                  spacing: Style.space(5)
+
+                  Text {
+                    id: selectedDpiValue
+                    text: root.activeDevice && root.activeDevice.dpi !== null
+                      ? String(root.activeDevice.dpi) : "—"
+                    color: root.foreground
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.display
+                    font.bold: true
+                  }
+
+                  Text {
+                    anchors.baseline: selectedDpiValue.baseline
+                    text: root.activeDevice && root.activeDevice.dpi !== null
+                      ? "DPI" : "Unavailable"
+                    color: Qt.rgba(root.foreground.r, root.foreground.g,
+                      root.foreground.b, 0.62)
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                  }
+                }
+              }
+            }
+
+            Rectangle {
+              id: batteryCard
+              width: (deviceMetrics.width - deviceMetrics.spacing) / 2
+              height: dpiCard.height
+              radius: dpiCard.radius
+              color: dpiCard.color
+
+              Column {
+                anchors.fill: parent
+                anchors.margins: Style.space(10)
+                spacing: Style.space(3)
+
+                Text {
+                  text: "BATTERY"
+                  color: Qt.rgba(root.foreground.r, root.foreground.g,
+                    root.foreground.b, 0.62)
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.caption
+                  font.letterSpacing: 0.7
+                }
+
+                Text {
+                  id: selectedBatteryValue
+                  text: root.activeDevice && root.activeDevice.battery !== null
+                    ? root.activeDevice.battery + "%" : "—"
+                  color: Model.batteryWarning(root.activeDevice, root.warningThreshold)
+                    ? Color.urgent : root.foreground
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.display
+                  font.bold: true
+                }
+              }
+            }
+          }
+
+          Row {
+            id: deviceStatus
+            spacing: Style.space(14)
+
+            Row {
+              spacing: Style.space(5)
+
+              Text {
+                text: "󰂄"
+                color: Qt.rgba(root.foreground.r, root.foreground.g,
+                  root.foreground.b, 0.62)
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+              }
+
+              Text {
+                id: chargingStatus
+                text: root.chargingText(root.activeDevice)
+                color: Qt.rgba(root.foreground.r, root.foreground.g,
+                  root.foreground.b, 0.72)
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+              }
+            }
+
+            Row {
+              spacing: Style.space(5)
+
+              Text {
+                text: "󰌘"
+                color: Qt.rgba(root.foreground.r, root.foreground.g,
+                  root.foreground.b, 0.62)
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+              }
+
+              Text {
+                id: connectionStatus
+                text: root.connectionTypeText(root.activeDevice)
+                color: Qt.rgba(root.foreground.r, root.foreground.g,
+                  root.foreground.b, 0.72)
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+              }
             }
           }
         }
