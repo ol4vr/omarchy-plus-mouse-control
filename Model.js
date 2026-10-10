@@ -62,14 +62,9 @@ function batteryText(device) {
   return device && device.battery !== null ? device.battery + "%" : "Battery unavailable"
 }
 
-function lowBattery(device, warningThreshold) {
+function batteryWarning(device, warningThreshold) {
   var threshold = finiteInteger(warningThreshold) || 15
   return !!device && device.battery !== null && device.battery <= threshold
-    && device.charging !== true
-}
-
-function criticalBattery(device) {
-  return !!device && device.battery !== null && device.battery <= 10
 }
 
 function connectionText(device) {
@@ -99,8 +94,7 @@ if (typeof module !== "undefined") {
     selectedDevice: selectedDevice,
     dpiText: dpiText,
     batteryText: batteryText,
-    lowBattery: lowBattery,
-    criticalBattery: criticalBattery,
+    batteryWarning: batteryWarning,
     connectionText: connectionText,
     tooltipText: tooltipText
   }

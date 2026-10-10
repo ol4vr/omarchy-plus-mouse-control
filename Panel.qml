@@ -84,7 +84,7 @@ Panel {
           Text {
             anchors.verticalCenter: parent.verticalCenter
             text: "󰍽"
-            color: Model.criticalBattery(root.activeDevice) ? Color.urgent : Color.accent
+            color: Color.accent
             font.family: root.fontFamily
             font.pixelSize: Style.font.heading
           }
@@ -163,8 +163,7 @@ Panel {
               Text {
                 anchors.centerIn: parent
                 text: "󰍽"
-                color: Model.criticalBattery(root.activeDevice)
-                  ? Color.urgent : Color.accent
+                color: Color.accent
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.heading
               }
@@ -176,7 +175,7 @@ Panel {
 
               Text {
                 text: "SELECTED DEVICE"
-                color: Color.accent
+                color: root.foreground
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.caption
                 font.bold: true
@@ -185,7 +184,7 @@ Panel {
               Text {
                 width: parent.width
                 text: root.activeDevice ? root.activeDevice.name : "Mouse unavailable"
-                color: Color.popups.text
+                color: Color.accent
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.body
                 font.bold: true
@@ -201,7 +200,7 @@ Panel {
                   text: Model.dpiText(root.activeDevice)
                   color: Color.popups.text
                   font.family: root.fontFamily
-                  font.pixelSize: Style.font.title
+                  font.pixelSize: Style.font.body
                   font.bold: true
                 }
 
@@ -217,12 +216,11 @@ Panel {
                   text: Model.batteryText(root.activeDevice)
                     + (root.activeDevice && root.activeDevice.charging === true
                       ? " · Charging" : "")
-                  color: Model.criticalBattery(root.activeDevice) ? Color.urgent
-                    : Model.lowBattery(root.activeDevice, root.warningThreshold)
-                      ? Color.accent : root.foreground
+                  color: Model.batteryWarning(root.activeDevice, root.warningThreshold)
+                    ? Color.urgent : Color.popups.text
                   font.family: root.fontFamily
-                  font.pixelSize: Style.font.bodySmall
-                  font.bold: Model.criticalBattery(root.activeDevice)
+                  font.pixelSize: Style.font.body
+                  font.bold: true
                 }
               }
 
@@ -315,7 +313,7 @@ Panel {
                 id: warningValue
                 anchors.verticalCenter: parent.verticalCenter
                 text: root.warningThreshold + "%"
-                color: Color.accent
+                color: root.foreground
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.body
                 font.bold: true

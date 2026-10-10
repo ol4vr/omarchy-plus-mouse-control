@@ -17,10 +17,11 @@ test("manifest identifies the owned left-bar widget", () => {
 
 test("bar presents only the selected battery beside the mouse icon", () => {
   assert.match(bar, /activeDevice\.battery/)
-  assert.match(bar, /return "󰍽\\u2002" \+ battery/)
   assert.doesNotMatch(bar, /var dpi|activeDevice\.dpi/)
-  assert.match(bar, /active: Model\.criticalBattery\(root\.activeDevice\)/)
-  assert.match(bar, /criticalBattery\(root\.activeDevice\) \? Color\.urgent : Color\.accent/)
+  assert.match(bar, /leadingGap: Style\.spaceReal\(4\)/)
+  assert.match(bar, /text: "󰍽"\s+color: button\.foreground/)
+  assert.match(bar, /color: root\.batteryWarning \? Color\.urgent : button\.foreground/)
+  assert.match(bar, /batteryWarning: Model\.batteryWarning\(activeDevice, warningThreshold\)/)
   assert.match(bar, /source: Qt\.resolvedUrl\("Panel\.qml"\)/)
   assert.match(bar, /interval: 5000/)
 })
@@ -46,12 +47,17 @@ test("popup keeps balanced content insets and selected-device emphasis", () => {
   assert.match(panel, /SELECTED DEVICE/)
   assert.match(panel, /text: "󰍽"/)
   assert.match(panel, /height: selectedDeviceContent\.implicitHeight \+ Style\.space\(24\)/)
+  assert.match(panel, /text: "SELECTED DEVICE"\s+color: root\.foreground/)
+  assert.match(panel, /root\.activeDevice\.name : "Mouse unavailable"\s+color: Color\.accent/)
 })
 
-test("popup accents the selected DPI and reserves urgent red for critical battery", () => {
+test("popup accents the selected DPI and gives DPI and battery equal emphasis", () => {
   assert.match(panel, /foreground: selected \? Color\.accent/)
   assert.match(panel, /bordered: selected/)
-  assert.match(panel, /criticalBattery\(root\.activeDevice\) \? Color\.urgent/)
+  assert.match(panel, /id: selectedDpi[\s\S]*font\.pixelSize: Style\.font\.body[\s\S]*font\.bold: true/)
+  assert.match(panel, /id: selectedBattery[\s\S]*font\.pixelSize: Style\.font\.body[\s\S]*font\.bold: true/)
+  assert.match(panel, /batteryWarning\(root\.activeDevice, root\.warningThreshold\)[\s\S]*\? Color\.urgent/)
+  assert.match(panel, /id: warningValue[\s\S]*color: root\.foreground/)
 })
 
 test("helper has no input monitor, RGB path, or mouse-disable operation", () => {

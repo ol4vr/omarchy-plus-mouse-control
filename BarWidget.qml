@@ -22,6 +22,10 @@ BarWidget {
   readonly property var activeDevice: Model.selectedDevice(status)
   readonly property int warningThreshold: status ? status.warningThreshold : 15
   readonly property color primaryColor: bar ? bar.barForeground : Color.foreground
+  readonly property real leadingGap: Style.spaceReal(4)
+  readonly property string batteryLabel: !activeDevice ? "…"
+    : activeDevice.battery === null ? "—" : activeDevice.battery + "%"
+  readonly property bool batteryWarning: Model.batteryWarning(activeDevice, warningThreshold)
   readonly property bool opened: panelLoader.item ? panelLoader.item.opened === true : false
   readonly property bool popoutSwitchClosing: panelLoader.item
     ? panelLoader.item.popoutSwitchClosing === true : false
@@ -74,7 +78,7 @@ BarWidget {
     panelLoader.item.hostWidget = root
   }
 
-  implicitWidth: button.implicitWidth
+  implicitWidth: button.implicitWidth + leadingGap
   implicitHeight: button.implicitHeight
   onBarChanged: injectPanel()
 
@@ -134,19 +138,46 @@ BarWidget {
 
   WidgetButton {
     id: button
-    anchors.fill: parent
+    anchors.top: parent.top
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    width: implicitWidth
     bar: root.bar
     horizontalMargin: 3
-    text: {
-      if (!root.activeDevice) return "󰍽 …"
-      var battery = root.activeDevice.battery === null ? "—" : root.activeDevice.battery + "%"
-      return "󰍽\u2002" + battery
-    }
-    foreground: root.primaryColor
-    active: Model.criticalBattery(root.activeDevice)
-      || Model.lowBattery(root.activeDevice, root.warningThreshold)
-    activeColor: Model.criticalBattery(root.activeDevice) ? Color.urgent : Color.accent
+    text: ""
+    hasVisualContent: true
+    labelVisible: false
+    fixedWidth: barContent.implicitWidth + scaledHorizontalMargin * 2
     tooltipText: Model.tooltipText(root.activeDevice)
+
+    Row {
+      id: barContent
+      anchors.centerIn: parent
+      spacing: Style.space(4)
+
+      Text {
+        text: "󰍽"
+        color: button.foreground
+        font.family: button.fontFamily
+        font.pixelSize: button.fontSize
+        renderType: Text.NativeRendering
+      }
+
+      Text {
+        text: root.batteryLabel
+        color: root.batteryWarning ? Color.urgent : button.foreground
+        font.family: button.fontFamily
+        font.pixelSize: button.fontSize
+        renderType: Text.NativeRendering
+
+        Behavior on color {
+          enabled: !root.bar || root.bar.foregroundAnimationEnabled
+          ColorAnimation { duration: 160 }
+        }
+      }
+    }
+
+    foreground: root.primaryColor
     onPressed: function(buttonCode) {
       if (buttonCode === Qt.LeftButton) root.toggle()
     }
