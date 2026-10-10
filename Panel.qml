@@ -17,7 +17,7 @@ Panel {
   readonly property int warningThreshold: status ? status.warningThreshold : 15
   readonly property color foreground: bar ? bar.foreground : Color.foreground
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
-  readonly property var presets: [800, 1200, 1600, 1800, 2400, 3200]
+  readonly property var presets: [600, 800, 1000, 1200, 1400, 1600]
 
   function open() {
     if (hostWidget) hostWidget.refresh()
@@ -144,95 +144,101 @@ Panel {
           border.width: 1
           border.color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.24)
 
-          Row {
+          Column {
             id: selectedDeviceContent
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             anchors.leftMargin: Style.space(12)
             anchors.rightMargin: Style.space(12)
-            spacing: Style.space(12)
+            spacing: Style.space(4)
 
-            Rectangle {
-              width: Style.space(42)
-              height: width
-              anchors.verticalCenter: parent.verticalCenter
-              radius: width / 2
-              color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.12)
+            Text {
+              text: "SELECTED DEVICE"
+              color: root.foreground
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.caption
+              font.bold: true
+            }
+
+            Text {
+              width: parent.width
+              text: root.activeDevice ? root.activeDevice.name : "Mouse unavailable"
+              color: Color.accent
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.body
+              font.bold: true
+              elide: Text.ElideRight
+            }
+
+            Row {
+              spacing: Style.space(8)
 
               Text {
-                anchors.centerIn: parent
                 text: "󰍽"
                 color: Color.accent
                 font.family: root.fontFamily
-                font.pixelSize: Style.font.heading
-              }
-            }
-
-            Column {
-              width: parent.width - Style.space(54)
-              spacing: Style.space(3)
-
-              Text {
-                text: "SELECTED DEVICE"
-                color: root.foreground
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.caption
-                font.bold: true
+                font.pixelSize: Style.font.body
               }
 
               Text {
-                width: parent.width
-                text: root.activeDevice ? root.activeDevice.name : "Mouse unavailable"
-                color: Color.accent
+                id: selectedDpi
+                text: Model.dpiText(root.activeDevice)
+                color: Color.popups.text
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.body
                 font.bold: true
-                elide: Text.ElideRight
               }
+            }
 
-              Row {
-                width: parent.width
+            Row {
+              spacing: Style.space(4)
 
-                Text {
-                  id: selectedDpi
-                  anchors.verticalCenter: parent.verticalCenter
-                  text: Model.dpiText(root.activeDevice)
-                  color: Color.popups.text
-                  font.family: root.fontFamily
-                  font.pixelSize: Style.font.body
-                  font.bold: true
-                }
-
-                Item {
-                  width: parent.width - selectedDpi.implicitWidth
-                    - selectedBattery.implicitWidth
-                  height: 1
-                }
-
-                Text {
-                  id: selectedBattery
-                  anchors.verticalCenter: parent.verticalCenter
-                  text: Model.batteryText(root.activeDevice)
-                    + (root.activeDevice && root.activeDevice.charging === true
-                      ? " · Charging" : "")
-                  color: Model.batteryWarning(root.activeDevice, root.warningThreshold)
-                    ? Color.urgent : Color.popups.text
-                  font.family: root.fontFamily
-                  font.pixelSize: Style.font.body
-                  font.bold: true
-                }
+              Text {
+                text: "󰁹"
+                color: root.foreground
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.body
               }
 
               Text {
-                visible: root.activeDevice && root.activeDevice.preferredDpi !== null
-                text: "Preferred: "
-                  + (root.activeDevice ? root.activeDevice.preferredDpi : "—") + " DPI"
-                color: Qt.rgba(root.foreground.r, root.foreground.g,
-                  root.foreground.b, 0.62)
+                text: "Battery"
+                color: Color.popups.text
                 font.family: root.fontFamily
-                font.pixelSize: Style.font.caption
+                font.pixelSize: Style.font.body
+                font.bold: true
               }
+
+              Text {
+                id: selectedBattery
+                text: root.activeDevice && root.activeDevice.battery !== null
+                  ? root.activeDevice.battery + "%" : "unavailable"
+                color: Model.batteryWarning(root.activeDevice, root.warningThreshold)
+                  ? Color.urgent : Color.popups.text
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.body
+                font.bold: true
+              }
+            }
+
+            Text {
+              id: selectedCharging
+              text: !root.activeDevice || root.activeDevice.charging === null
+                ? "Charging status unavailable"
+                : root.activeDevice.charging ? "Charging" : "Not charging"
+              color: root.foreground
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.bodySmall
+            }
+
+            Text {
+              visible: root.activeDevice && root.activeDevice.preferredDpi !== null
+              text: "Preferred: "
+                + (root.activeDevice ? root.activeDevice.preferredDpi : "—") + " DPI"
+              color: Qt.rgba(root.foreground.r, root.foreground.g,
+                root.foreground.b, 0.62)
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.caption
             }
           }
         }

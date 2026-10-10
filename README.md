@@ -13,8 +13,9 @@ placement is the left bar immediately after `io.github.ol4vr.openrgb-presets`.
   the hover tooltip and popup retain the device name, DPI, and battery details.
 - Shows the manually selected mouse, connection state, current DPI when the
   backend can read it, battery percentage, and charging state when reported.
-- Provides 800, 1200, 1600, 1800, 2400, and 3200 DPI presets. A write occurs
-  only when the owner clicks a preset.
+- Provides the same 600, 800, 1000, 1200, 1400, and 1600 DPI presets for both
+  mice. An out-of-list current value remains visible without selecting a
+  preset, and a write occurs only when the owner clicks a preset.
 - Stores the selected mouse and last successfully verified DPI per device in
   `${XDG_STATE_HOME:-~/.local/state}/omarchy-plus/mouse-control/preferences.json`.
 - Sends one normal-urgency warning when either mouse reaches the configured

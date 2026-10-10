@@ -22,7 +22,7 @@ BarWidget {
   readonly property var activeDevice: Model.selectedDevice(status)
   readonly property int warningThreshold: status ? status.warningThreshold : 15
   readonly property color primaryColor: bar ? bar.barForeground : Color.foreground
-  readonly property real leadingGap: Style.spaceReal(4)
+  readonly property real leadingGap: Style.spaceReal(8)
   readonly property string batteryLabel: !activeDevice ? "…"
     : activeDevice.battery === null ? "—" : activeDevice.battery + "%"
   readonly property bool batteryWarning: Model.batteryWarning(activeDevice, warningThreshold)

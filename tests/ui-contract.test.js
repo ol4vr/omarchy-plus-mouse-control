@@ -18,7 +18,7 @@ test("manifest identifies the owned left-bar widget", () => {
 test("bar presents only the selected battery beside the mouse icon", () => {
   assert.match(bar, /activeDevice\.battery/)
   assert.doesNotMatch(bar, /var dpi|activeDevice\.dpi/)
-  assert.match(bar, /leadingGap: Style\.spaceReal\(4\)/)
+  assert.match(bar, /leadingGap: Style\.spaceReal\(8\)/)
   assert.match(bar, /text: "󰍽"\s+color: button\.foreground/)
   assert.match(bar, /color: root\.batteryWarning \? Color\.urgent : button\.foreground/)
   assert.match(bar, /batteryWarning: Model\.batteryWarning\(activeDevice, warningThreshold\)/)
@@ -28,7 +28,9 @@ test("bar presents only the selected battery beside the mouse icon", () => {
 
 test("popup offers manual device selection and explicit DPI presets", () => {
   assert.match(panel, /\["naga", "logitech"\]/)
-  assert.match(panel, /\[800, 1200, 1600, 1800, 2400, 3200\]/)
+  assert.match(panel, /\[600, 800, 1000, 1200, 1400, 1600\]/)
+  assert.match(panel, /columns: 3/)
+  assert.match(panel, /selected: root\.activeDevice && root\.activeDevice\.dpi === modelData/)
   assert.match(panel, /\["set-dpi", activeDevice\.id/)
   assert.doesNotMatch(panel, /\bRGB\b|lighting|button mapping/i)
 })
@@ -45,18 +47,18 @@ test("popup keeps balanced content insets and selected-device emphasis", () => {
   assert.match(panel, /anchors\.leftMargin: Style\.space\(16\)/)
   assert.match(panel, /anchors\.rightMargin: Style\.space\(16\)/)
   assert.match(panel, /SELECTED DEVICE/)
-  assert.match(panel, /text: "󰍽"/)
   assert.match(panel, /height: selectedDeviceContent\.implicitHeight \+ Style\.space\(24\)/)
   assert.match(panel, /text: "SELECTED DEVICE"\s+color: root\.foreground/)
   assert.match(panel, /root\.activeDevice\.name : "Mouse unavailable"\s+color: Color\.accent/)
 })
 
-test("popup accents the selected DPI and gives DPI and battery equal emphasis", () => {
+test("popup accents the selected DPI and presents explicit device telemetry", () => {
   assert.match(panel, /foreground: selected \? Color\.accent/)
   assert.match(panel, /bordered: selected/)
-  assert.match(panel, /id: selectedDpi[\s\S]*font\.pixelSize: Style\.font\.body[\s\S]*font\.bold: true/)
-  assert.match(panel, /id: selectedBattery[\s\S]*font\.pixelSize: Style\.font\.body[\s\S]*font\.bold: true/)
-  assert.match(panel, /batteryWarning\(root\.activeDevice, root\.warningThreshold\)[\s\S]*\? Color\.urgent/)
+  assert.match(panel, /text: "󰍽"[\s\S]*id: selectedDpi[\s\S]*Model\.dpiText\(root\.activeDevice\)/)
+  assert.match(panel, /text: "󰁹"[\s\S]*text: "Battery"[\s\S]*id: selectedBattery/)
+  assert.match(panel, /id: selectedBattery[\s\S]*batteryWarning\(root\.activeDevice, root\.warningThreshold\)[\s\S]*\? Color\.urgent/)
+  assert.match(panel, /id: selectedCharging[\s\S]*"Charging status unavailable"[\s\S]*"Charging" : "Not charging"/)
   assert.match(panel, /id: warningValue[\s\S]*color: root\.foreground/)
 })
 
