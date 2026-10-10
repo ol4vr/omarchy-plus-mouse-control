@@ -11,7 +11,7 @@ const helper = fs.readFileSync(path.join(root, "mouse-control"), "utf8")
 
 test("manifest identifies the owned left-bar widget", () => {
   assert.equal(manifest.id, "io.github.ol4vr.mouse-control")
-  assert.equal(manifest.version, "0.2.4")
+  assert.equal(manifest.version, "0.2.5")
   assert.equal(manifest.barWidget.defaultSection, "left")
   assert.deepEqual(manifest.kinds, ["bar-widget"])
 })
@@ -38,7 +38,8 @@ test("popup offers manual device selection and explicit DPI presets", () => {
 
 test("popup presents the persisted warning threshold as compact status", () => {
   assert.match(panel, /LOW-BATTERY WARNING/)
-  assert.match(panel, /Notify once at or below/)
+  assert.match(panel, /You will be notified at or below/)
+  assert.doesNotMatch(panel, /Notify once at or below/)
   assert.match(panel, /warningThreshold \+ "%"/)
   assert.doesNotMatch(panel, /\[15, 20, 25\]/)
   assert.doesNotMatch(panel, /Critical notification/)
@@ -63,6 +64,8 @@ test("popup uses equal neutral metric cards and compact device status", () => {
   assert.match(panel, /id: selectedBatteryValue[\s\S]*root\.activeDevice\.battery[\s\S]*batteryWarning\(root\.activeDevice, root\.warningThreshold\)[\s\S]*\? Color\.urgent : root\.foreground/)
   assert.match(panel, /id: chargingStatus[\s\S]*root\.chargingText\(root\.activeDevice\)/)
   assert.match(panel, /id: connectionStatus[\s\S]*root\.connectionTypeText\(root\.activeDevice\)/)
+  assert.match(panel, /id: deviceStatus\s+anchors\.horizontalCenter: parent\.horizontalCenter\s+spacing: Style\.space\(14\)/)
+  assert.match(panel, /device\.charging === null\) return "Unavailable"/)
   assert.match(panel, /return device\.charging \? "Charging" : "Not charging"/)
   assert.doesNotMatch(panel, /Model\.connectionText\(root\.activeDevice\)/)
   assert.match(panel, /id: warningValue[\s\S]*color: root\.foreground/)

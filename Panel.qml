@@ -266,6 +266,7 @@ Panel {
 
           Row {
             id: deviceStatus
+            anchors.horizontalCenter: parent.horizontalCenter
             spacing: Style.space(14)
 
             Row {
@@ -373,7 +374,7 @@ Panel {
               Text {
                 id: warningLabel
                 anchors.verticalCenter: parent.verticalCenter
-                text: "Notify once at or below"
+                text: "You will be notified at or below"
                 color: root.foreground
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.bodySmall
