@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "io.github.ol4vr.mouse-control",
   "name": "Mouse Control",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "author": "Olav Rorvik",
   "license": "MIT",
   "description": "Unified Naga V3 Pro and PRO X Superlight status and DPI control for Hugin.",

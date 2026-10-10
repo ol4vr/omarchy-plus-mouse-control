@@ -17,8 +17,10 @@ test("manifest identifies the owned left-bar widget", () => {
 
 test("bar presents only the selected battery beside the mouse icon", () => {
   assert.match(bar, /activeDevice\.battery/)
-  assert.match(bar, /return "󰍽 " \+ battery/)
+  assert.match(bar, /return "󰍽\\u2002" \+ battery/)
   assert.doesNotMatch(bar, /var dpi|activeDevice\.dpi/)
+  assert.match(bar, /active: Model\.criticalBattery\(root\.activeDevice\)/)
+  assert.match(bar, /criticalBattery\(root\.activeDevice\) \? Color\.urgent : Color\.accent/)
   assert.match(bar, /source: Qt\.resolvedUrl\("Panel\.qml"\)/)
   assert.match(bar, /interval: 5000/)
 })
@@ -42,6 +44,14 @@ test("popup keeps balanced content insets and selected-device emphasis", () => {
   assert.match(panel, /anchors\.leftMargin: Style\.space\(16\)/)
   assert.match(panel, /anchors\.rightMargin: Style\.space\(16\)/)
   assert.match(panel, /SELECTED DEVICE/)
+  assert.match(panel, /text: "󰍽"/)
+  assert.match(panel, /height: selectedDeviceContent\.implicitHeight \+ Style\.space\(24\)/)
+})
+
+test("popup accents the selected DPI and reserves urgent red for critical battery", () => {
+  assert.match(panel, /foreground: selected \? Color\.accent/)
+  assert.match(panel, /bordered: selected/)
+  assert.match(panel, /criticalBattery\(root\.activeDevice\) \? Color\.urgent/)
 })
 
 test("helper has no input monitor, RGB path, or mouse-disable operation", () => {

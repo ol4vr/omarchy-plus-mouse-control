@@ -46,6 +46,7 @@ assert.equal(status.warningThreshold, 15)
 assert.equal(Model.dpiText(Model.selectedDevice(status)), "1800 DPI")
 assert.equal(Model.batteryText(Model.selectedDevice(status)), "14%")
 assert.equal(Model.lowBattery(Model.selectedDevice(status)), true)
+assert.equal(Model.criticalBattery(Model.selectedDevice(status)), false)
 assert.equal(Model.connectionText(Model.selectedDevice(status)), "Connected · HyperSpeed")
 assert.match(
   Model.tooltipText(Model.selectedDevice(status)),
@@ -54,6 +55,12 @@ assert.match(
 assert.equal(Model.deviceById(status, "logitech").dpi, null)
 assert.equal(Model.dpiText(Model.deviceById(status, "logitech")), "DPI unavailable")
 assert.equal(Model.lowBattery(Model.deviceById(status, "logitech")), false)
+status.devices[0].battery = 10
+assert.equal(Model.criticalBattery(Model.selectedDevice(status)), true)
+status.devices[0].charging = true
+assert.equal(Model.criticalBattery(Model.selectedDevice(status)), true)
+status.devices[0].battery = 11
+assert.equal(Model.criticalBattery(Model.selectedDevice(status)), false)
 assert.equal(Model.parseStatus("not json"), null)
 
 console.log("Mouse Control model tests: PASS")

@@ -140,11 +140,12 @@ BarWidget {
     text: {
       if (!root.activeDevice) return "󰍽 …"
       var battery = root.activeDevice.battery === null ? "—" : root.activeDevice.battery + "%"
-      return "󰍽 " + battery
+      return "󰍽\u2002" + battery
     }
     foreground: root.primaryColor
-    active: Model.lowBattery(root.activeDevice, root.warningThreshold)
-    activeColor: Color.urgent
+    active: Model.criticalBattery(root.activeDevice)
+      || Model.lowBattery(root.activeDevice, root.warningThreshold)
+    activeColor: Model.criticalBattery(root.activeDevice) ? Color.urgent : Color.accent
     tooltipText: Model.tooltipText(root.activeDevice)
     onPressed: function(buttonCode) {
       if (buttonCode === Qt.LeftButton) root.toggle()

@@ -84,8 +84,7 @@ Panel {
           Text {
             anchors.verticalCenter: parent.verticalCenter
             text: "󰍽"
-            color: Model.lowBattery(root.activeDevice, root.warningThreshold)
-              ? Color.urgent : Color.accent
+            color: Model.criticalBattery(root.activeDevice) ? Color.urgent : Color.accent
             font.family: root.fontFamily
             font.pixelSize: Style.font.heading
           }
@@ -139,58 +138,103 @@ Panel {
 
         Rectangle {
           width: parent.width
-          height: Style.space(132)
+          height: selectedDeviceContent.implicitHeight + Style.space(24)
           radius: Style.cornerRadius
-          color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.08)
+          color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.06)
           border.width: 1
-          border.color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.42)
+          border.color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.24)
 
-          Column {
-            anchors.fill: parent
-            anchors.margins: Style.space(14)
-            spacing: Style.space(5)
+          Row {
+            id: selectedDeviceContent
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.leftMargin: Style.space(12)
+            anchors.rightMargin: Style.space(12)
+            spacing: Style.space(12)
 
-            Text {
-              text: "SELECTED DEVICE"
-              color: Color.accent
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.caption
-              font.bold: true
+            Rectangle {
+              width: Style.space(42)
+              height: width
+              anchors.verticalCenter: parent.verticalCenter
+              radius: width / 2
+              color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.12)
+
+              Text {
+                anchors.centerIn: parent
+                text: "󰍽"
+                color: Model.criticalBattery(root.activeDevice)
+                  ? Color.urgent : Color.accent
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.heading
+              }
             }
 
-            Text {
-              width: parent.width
-              text: root.activeDevice ? root.activeDevice.name : "Mouse unavailable"
-              color: Color.popups.text
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.body
-              font.bold: true
-              elide: Text.ElideRight
-            }
+            Column {
+              width: parent.width - Style.space(54)
+              spacing: Style.space(3)
 
-            Text {
-              text: Model.dpiText(root.activeDevice)
-              color: Color.popups.text
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.title
-              font.bold: true
-            }
+              Text {
+                text: "SELECTED DEVICE"
+                color: Color.accent
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+                font.bold: true
+              }
 
-            Text {
-              text: Model.batteryText(root.activeDevice)
-                + (root.activeDevice && root.activeDevice.charging === true ? " · Charging" : "")
-              color: Model.lowBattery(root.activeDevice, root.warningThreshold)
-                ? Color.urgent : root.foreground
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.bodySmall
-            }
+              Text {
+                width: parent.width
+                text: root.activeDevice ? root.activeDevice.name : "Mouse unavailable"
+                color: Color.popups.text
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.body
+                font.bold: true
+                elide: Text.ElideRight
+              }
 
-            Text {
-              visible: root.activeDevice && root.activeDevice.preferredDpi !== null
-              text: "Preferred: " + (root.activeDevice ? root.activeDevice.preferredDpi : "—") + " DPI"
-              color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.62)
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.caption
+              Row {
+                width: parent.width
+
+                Text {
+                  id: selectedDpi
+                  anchors.verticalCenter: parent.verticalCenter
+                  text: Model.dpiText(root.activeDevice)
+                  color: Color.popups.text
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.title
+                  font.bold: true
+                }
+
+                Item {
+                  width: parent.width - selectedDpi.implicitWidth
+                    - selectedBattery.implicitWidth
+                  height: 1
+                }
+
+                Text {
+                  id: selectedBattery
+                  anchors.verticalCenter: parent.verticalCenter
+                  text: Model.batteryText(root.activeDevice)
+                    + (root.activeDevice && root.activeDevice.charging === true
+                      ? " · Charging" : "")
+                  color: Model.criticalBattery(root.activeDevice) ? Color.urgent
+                    : Model.lowBattery(root.activeDevice, root.warningThreshold)
+                      ? Color.accent : root.foreground
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.bodySmall
+                  font.bold: Model.criticalBattery(root.activeDevice)
+                }
+              }
+
+              Text {
+                visible: root.activeDevice && root.activeDevice.preferredDpi !== null
+                text: "Preferred: "
+                  + (root.activeDevice ? root.activeDevice.preferredDpi : "—") + " DPI"
+                color: Qt.rgba(root.foreground.r, root.foreground.g,
+                  root.foreground.b, 0.62)
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+              }
             }
           }
         }
@@ -218,9 +262,11 @@ Panel {
                 width: (content.width - Style.space(16)) / 3
                 text: String(modelData)
                 fontFamily: root.fontFamily
-                foreground: root.foreground
+                foreground: selected ? Color.accent
+                  : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.72)
                 accent: Color.accent
                 selected: root.activeDevice && root.activeDevice.dpi === modelData
+                bordered: selected
                 enabled: root.activeDevice && root.activeDevice.dpiWrite
                   && hostWidget && !hostWidget.busy
                 onClicked: root.setDpi(modelData)
