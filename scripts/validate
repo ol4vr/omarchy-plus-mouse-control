@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+repo=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
+expected_id=io.github.ol4vr.mouse-control
+runtime_list="$repo/runtime-files.txt"
+omarchy_path=${OMARCHY_PATH:-/usr/share/omarchy}
+
+python3 - "$repo" "$expected_id" "$runtime_list" <<'PY'
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path, PurePosixPath
+
+root = Path(sys.argv[1]).resolve()
+expected_id = sys.argv[2]
+runtime_list = Path(sys.argv[3])
+manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+
+if manifest.get("schemaVersion") != 1 or manifest.get("id") != expected_id:
+    raise RuntimeError("manifest identity does not match Mouse Control")
+if manifest.get("kinds") != ["bar-widget"]:
+    raise RuntimeError("Mouse Control must declare only bar-widget")
+if manifest.get("entryPoints", {}).get("barWidget") != "BarWidget.qml":
+    raise RuntimeError("unexpected bar-widget entry point")
+if manifest.get("barWidget", {}).get("defaultSection") != "left":
+    raise RuntimeError("Mouse Control must default to the left bar")
+
+runtime_paths: list[str] = []
+for line in runtime_list.read_text(encoding="utf-8").splitlines():
+    value = line.strip()
+    if not value:
+        continue
+    candidate = PurePosixPath(value)
+    if candidate.is_absolute() or ".." in candidate.parts or value in runtime_paths:
+        raise RuntimeError(f"unsafe or duplicate runtime path: {value}")
+    path = root / value
+    if not path.is_file() or path.is_symlink():
+        raise RuntimeError(f"runtime file is missing or unsafe: {value}")
+    runtime_paths.append(value)
+
+for required in (
+    "manifest.json", "BarWidget.qml", "Panel.qml", "Model.js", "mouse-control",
+    "README.md", "LICENSE",
+):
+    if required not in runtime_paths:
+        raise RuntimeError(f"required runtime file is not allowlisted: {required}")
+
+for qml_name in ("BarWidget.qml", "Panel.qml"):
+    qml = (root / qml_name).read_text(encoding="utf-8")
+    if qml.count(f'moduleName: "{expected_id}"') != 1:
+        raise RuntimeError(f"{qml_name} module name does not match the manifest")
+
+for path in root.rglob("*"):
+    relative = path.relative_to(root)
+    if relative.parts and relative.parts[0] == ".git":
+        continue
+    if path.is_symlink():
+        raise RuntimeError(f"repository payload contains a symlink: {relative}")
+PY
+
+omarchy plugin validate "$repo"
+qmllint -I "$omarchy_path/shell" "$repo/BarWidget.qml" "$repo/Panel.qml"
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s "$repo/tests" -p 'test_*.py'
+node "$repo/tests/model-test.js"
+node --test "$repo/tests/ui-contract.test.js"
+PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile "$repo/mouse-control"
+bash -n "$repo/scripts/validate" "$repo/scripts/dev-deploy" "$repo/scripts/dev-remove"
+rg -q 'after: "io.github.ol4vr.openrgb-presets"' "$repo/README.md"
+rg -q 'hardware_writes=false' "$repo/README.md"
+rg -q 'lighting_writes=false' "$repo/README.md"
+
+if git -C "$repo" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C "$repo" diff --check
+fi
+
+echo "Mouse Control validation: PASS"

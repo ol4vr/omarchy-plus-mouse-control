@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+repo=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
+expected_repo=/home/ol4vr/Projects/omarchy-plus-apps/omarchy-plus-mouse-control
+plugin_id=io.github.ol4vr.mouse-control
+plugin_root=/home/ol4vr/.config/omarchy/plugins
+target="$plugin_root/$plugin_id"
+runtime_list="$repo/runtime-files.txt"
+omarchy_path=${OMARCHY_PATH:-/usr/share/omarchy}
+mode=${1:-deploy}
+
+case "$mode" in
+  deploy|--check) ;;
+  *) echo "Usage: $0 [--check]" >&2; exit 2 ;;
+esac
+
+[[ "$repo" == "$expected_repo" ]] || { echo "Refusing unexpected source path: $repo" >&2; exit 1; }
+branch=$(git -C "$repo" branch --show-current)
+if [[ -z "$branch" || "$branch" == main || "$branch" == master ]]; then
+  echo "Refusing deployment from non-development branch: ${branch:-detached}" >&2
+  exit 1
+fi
+
+"$repo/scripts/validate"
+marker_text=$(mktemp /tmp/omarchy-plus-mouse-control-marker.XXXXXX)
+stage=
+cleanup() {
+  [[ -z "$stage" || ! -d "$stage" ]] || rm -rf -- "$stage"
+  rm -f -- "$marker_text"
+}
+trap cleanup EXIT
+printf '%s\n' 'schema=1' "id=$plugin_id" "source=$expected_repo" > "$marker_text"
+
+if [[ -e "$target" ]]; then
+  [[ -d "$target" && ! -e "$target/.git" && -f "$target/.omarchy-plus-development" ]] || {
+    echo "Refusing unrecognized plugin target: $target" >&2; exit 1;
+  }
+  cmp -s "$marker_text" "$target/.omarchy-plus-development" || {
+    echo "Refusing development directory with a foreign marker: $target" >&2; exit 1;
+  }
+fi
+
+if [[ "$mode" == --check ]]; then
+  stage=$(mktemp -d /tmp/omarchy-plus-mouse-control-stage.XXXXXX)
+else
+  mkdir -p "$plugin_root"
+  stage=$(mktemp -d "$plugin_root/.mouse-control-stage.XXXXXX")
+fi
+
+while IFS= read -r relative; do
+  [[ -n "$relative" ]] || continue
+  permissions=0644
+  [[ "$relative" == mouse-control ]] && permissions=0755
+  install -D -m "$permissions" "$repo/$relative" "$stage/$relative"
+done < "$runtime_list"
+install -m 0644 "$marker_text" "$stage/.omarchy-plus-development"
+omarchy plugin validate "$stage"
+qmllint -I "$omarchy_path/shell" "$stage/BarWidget.qml" "$stage/Panel.qml"
+
+if [[ "$mode" == --check ]]; then
+  echo "Mouse Control development deployment check: PASS"
+  echo "No live configuration or hardware changed."
+  exit 0
+fi
+
+backup=
+if [[ -d "$target" ]]; then
+  backup="$plugin_root/.mouse-control-previous.$$"
+  [[ ! -e "$backup" ]] || { echo "Refusing unexpected backup path: $backup" >&2; exit 1; }
+  mv -- "$target" "$backup"
+fi
+if ! mv -- "$stage" "$target"; then
+  [[ -z "$backup" || ! -d "$backup" ]] || mv -- "$backup" "$target"
+  echo "Development deployment failed; previous copy restored." >&2
+  exit 1
+fi
+stage=
+[[ -z "$backup" || ! -d "$backup" ]] || rm -rf -- "$backup"
+omarchy restart shell
+
+echo "Mouse Control development copy deployed; no mouse setting was changed."
+echo "Enable manually: omarchy plugin enable $plugin_id"
+echo "Remove: $repo/scripts/dev-remove"

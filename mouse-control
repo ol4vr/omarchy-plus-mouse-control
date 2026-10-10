@@ -1,0 +1,442 @@
+#!/usr/bin/env python3
+"""Small Hugin-specific bridge for the Omarchy+ Mouse Control plugin."""
+
+from __future__ import annotations
+
+import ast
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+from typing import Any
+
+NAGA_BUS = "org.nagacontrol.Service1"
+NAGA_PATH = "/org/nagacontrol/Service1"
+NAGA_INTERFACE = "org.nagacontrol.Service1"
+DEVICE_IDS = ("naga", "logitech")
+DPI_MIN = 100
+DPI_MAX = 50000
+DEFAULT_WARNING_THRESHOLD = 20
+CRITICAL_THRESHOLD = 10
+RECOVERY_MARGIN = 5
+WARNING_THRESHOLD_MIN = CRITICAL_THRESHOLD + 1
+WARNING_THRESHOLD_MAX = 50
+
+
+class MouseControlError(RuntimeError):
+    pass
+
+
+def state_path() -> Path:
+    override = os.environ.get("MOUSE_CONTROL_STATE_PATH")
+    if override:
+        return Path(override)
+    root = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local/state"))
+    return root / "omarchy-plus/mouse-control/preferences.json"
+
+
+def load_preferences(path: Path | None = None) -> dict[str, Any]:
+    target = path or state_path()
+    try:
+        document = json.loads(target.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return default_preferences()
+    if not isinstance(document, dict) or document.get("schema") != 1:
+        return default_preferences()
+    selected = document.get("selected")
+    preferred = document.get("preferred_dpi")
+    warning_threshold = integer_or_none(document.get("warning_threshold"))
+    if warning_threshold is None or not (
+        WARNING_THRESHOLD_MIN <= warning_threshold <= WARNING_THRESHOLD_MAX
+    ):
+        warning_threshold = DEFAULT_WARNING_THRESHOLD
+    raw_levels = document.get("notification_levels")
+    raw_levels = raw_levels if isinstance(raw_levels, dict) else {}
+    return {
+        "schema": 1,
+        "selected": selected if selected in DEVICE_IDS else "naga",
+        "preferred_dpi": preferred if isinstance(preferred, dict) else {},
+        "warning_threshold": warning_threshold,
+        "notification_levels": {
+            device_id: normalized_notification_level(raw_levels.get(device_id))
+            for device_id in DEVICE_IDS
+        },
+    }
+
+
+def default_preferences() -> dict[str, Any]:
+    return {
+        "schema": 1,
+        "selected": "naga",
+        "preferred_dpi": {},
+        "warning_threshold": DEFAULT_WARNING_THRESHOLD,
+        "notification_levels": {device_id: 0 for device_id in DEVICE_IDS},
+    }
+
+
+def save_preferences(preferences: dict[str, Any], path: Path | None = None) -> None:
+    target = path or state_path()
+    target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    temporary = target.with_suffix(".tmp")
+    temporary.write_text(
+        json.dumps(preferences, sort_keys=True, separators=(",", ":")) + "\n",
+        encoding="utf-8",
+    )
+    os.chmod(temporary, 0o600)
+    temporary.replace(target)
+
+
+def run(arguments: list[str]) -> str:
+    try:
+        completed = subprocess.run(
+            arguments,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=4,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise MouseControlError(f"{arguments[0]} is unavailable") from exc
+    if completed.returncode != 0:
+        message = completed.stderr.strip() or completed.stdout.strip()
+        raise MouseControlError(message or f"{arguments[0]} failed")
+    return completed.stdout.strip()
+
+
+def gdbus_call(method: str, *arguments: int) -> str:
+    command = [
+        "gdbus",
+        "call",
+        "--session",
+        "--dest",
+        NAGA_BUS,
+        "--object-path",
+        NAGA_PATH,
+        "--method",
+        f"{NAGA_INTERFACE}.{method}",
+    ]
+    command.extend(str(value) for value in arguments)
+    return run(command)
+
+
+def parse_gdbus_string(output: str) -> str:
+    try:
+        values = ast.literal_eval(output)
+    except (SyntaxError, ValueError) as exc:
+        raise MouseControlError("Naga Control returned an unreadable response") from exc
+    if (
+        not isinstance(values, tuple)
+        or len(values) != 1
+        or not isinstance(values[0], str)
+    ):
+        raise MouseControlError("Naga Control returned an unexpected response")
+    return values[0]
+
+
+def naga_status(preferred: object = None) -> dict[str, Any]:
+    device = base_device("naga", "Razer Naga V3 Pro", preferred)
+    try:
+        snapshot = json.loads(parse_gdbus_string(gdbus_call("GetSnapshot")))
+        if not isinstance(snapshot, dict):
+            raise MouseControlError("Naga Control returned an unexpected snapshot")
+    except (MouseControlError, json.JSONDecodeError) as exc:
+        device["error"] = str(exc) or "Naga Control is unavailable"
+        return device
+    observed = snapshot.get("observed")
+    observed = observed if isinstance(observed, dict) else {}
+    device.update(
+        connected=snapshot.get("status") != "absent",
+        available=snapshot.get("status") == "available",
+        connection=str(snapshot.get("transport") or "unknown"),
+        battery=number_or_none(observed.get("battery_percent")),
+        charging=bool_or_none(observed.get("charging")),
+        dpi=dpi_value(observed.get("dpi")),
+        dpi_write=snapshot.get("status") == "available",
+        error=snapshot.get("error") or snapshot.get("mode_error"),
+    )
+    return device
+
+
+def power_supply_status() -> tuple[bool, int | None, bool | None]:
+    for supply in sorted(Path("/sys/class/power_supply").glob("hidpp_battery_*")):
+        if read_text(supply / "manufacturer").lower() != "logitech":
+            continue
+        if "pro x" not in read_text(supply / "model_name").lower():
+            continue
+        battery = integer_or_none(read_text(supply / "capacity"))
+        raw_status = read_text(supply / "status").lower()
+        charging = (
+            True
+            if raw_status == "charging"
+            else False
+            if raw_status == "discharging"
+            else None
+        )
+        return True, battery, charging
+    return False, None, None
+
+
+def ratbag_device() -> str | None:
+    if shutil.which("ratbagctl") is None:
+        return None
+    for line in run(["ratbagctl", "list"]).splitlines():
+        if ":" not in line:
+            continue
+        identifier, name = line.split(":", 1)
+        lowered = name.lower()
+        if "logitech" in lowered and "pro x" in lowered:
+            return identifier.strip()
+    return None
+
+
+def ratbag_dpi(identifier: str) -> int | None:
+    output = run(["ratbagctl", identifier, "dpi", "get"])
+    match = re.search(r"\b([0-9]+)(?:x[0-9]+)?dpi\b", output, re.IGNORECASE)
+    return int(match.group(1)) if match else None
+
+
+def logitech_status(preferred: object = None) -> dict[str, Any]:
+    connected, battery, charging = power_supply_status()
+    device = base_device("logitech", "Logitech PRO X Superlight", preferred)
+    device.update(
+        connected=connected,
+        available=connected,
+        connection="lightspeed" if connected else "unavailable",
+        battery=battery,
+        charging=charging,
+    )
+    if not connected:
+        return device
+    try:
+        identifier = ratbag_device()
+        if identifier is None:
+            device["error"] = "DPI control requires libratbag"
+            return device
+        device["dpi"] = ratbag_dpi(identifier)
+        device["dpi_write"] = device["dpi"] is not None
+        if device["dpi"] is None:
+            device["error"] = "libratbag did not report current DPI"
+    except MouseControlError as exc:
+        device["error"] = str(exc)
+    return device
+
+
+def base_device(device_id: str, name: str, preferred: object) -> dict[str, Any]:
+    return {
+        "id": device_id,
+        "name": name,
+        "connected": False,
+        "available": False,
+        "connection": "unavailable",
+        "battery": None,
+        "charging": None,
+        "dpi": None,
+        "preferred_dpi": integer_or_none(preferred),
+        "dpi_write": False,
+        "disable_supported": False,
+        "error": None,
+    }
+
+
+def status_document() -> dict[str, Any]:
+    preferences = load_preferences()
+    preferred = preferences["preferred_dpi"]
+    devices = [
+        naga_status(preferred.get("naga")),
+        logitech_status(preferred.get("logitech")),
+    ]
+    evaluate_battery_notifications(devices, preferences)
+    return {
+        "schema": 1,
+        "selected": preferences["selected"],
+        "warning_threshold": preferences["warning_threshold"],
+        "critical_threshold": CRITICAL_THRESHOLD,
+        "auto_switch": False,
+        "disable_supported": False,
+        "devices": devices,
+    }
+
+
+def select_device(device_id: str) -> None:
+    require_device_id(device_id)
+    preferences = load_preferences()
+    preferences["selected"] = device_id
+    save_preferences(preferences)
+
+
+def set_warning_threshold(raw_threshold: str) -> None:
+    try:
+        threshold = int(raw_threshold)
+    except ValueError as exc:
+        raise MouseControlError("warning threshold must be an integer") from exc
+    if not WARNING_THRESHOLD_MIN <= threshold <= WARNING_THRESHOLD_MAX:
+        raise MouseControlError(
+            f"warning threshold must be from {WARNING_THRESHOLD_MIN} through "
+            f"{WARNING_THRESHOLD_MAX}"
+        )
+    preferences = load_preferences()
+    preferences["warning_threshold"] = threshold
+    preferences["notification_levels"] = {device_id: 0 for device_id in DEVICE_IDS}
+    save_preferences(preferences)
+
+
+def evaluate_battery_notifications(
+    devices: list[dict[str, Any]], preferences: dict[str, Any]
+) -> None:
+    changed = False
+    threshold = preferences["warning_threshold"]
+    levels = preferences["notification_levels"]
+    for device in devices:
+        device_id = device["id"]
+        battery = device.get("battery")
+        if not device.get("connected") or not isinstance(battery, int):
+            continue
+        current_level = levels[device_id]
+        if battery >= threshold + RECOVERY_MARGIN:
+            if current_level != 0:
+                levels[device_id] = 0
+                changed = True
+            continue
+        if device.get("charging") is True:
+            continue
+        target_level = (
+            2 if battery <= CRITICAL_THRESHOLD else 1 if battery <= threshold else 0
+        )
+        if target_level > current_level and send_battery_notification(
+            device["name"], battery, target_level
+        ):
+            levels[device_id] = target_level
+            changed = True
+    if changed:
+        save_preferences(preferences)
+
+
+def send_battery_notification(name: str, battery: int, level: int) -> bool:
+    urgency = "critical" if level == 2 else "normal"
+    headline = f"{name} battery {'critical' if level == 2 else 'low'}"
+    body = f"{name} is at {battery}%. Connect the USB charging cable."
+    try:
+        run(
+            [
+                "omarchy-notification-send",
+                "--app-name",
+                "Mouse Control",
+                "-g",
+                "󰍽",
+                "-u",
+                urgency,
+                headline,
+                body,
+            ]
+        )
+    except MouseControlError:
+        return False
+    return True
+
+
+def set_dpi(device_id: str, raw_dpi: str) -> dict[str, Any]:
+    require_device_id(device_id)
+    try:
+        dpi = int(raw_dpi)
+    except ValueError as exc:
+        raise MouseControlError("DPI must be an integer") from exc
+    if not DPI_MIN <= dpi <= DPI_MAX:
+        raise MouseControlError(f"DPI must be from {DPI_MIN} through {DPI_MAX}")
+    if device_id == "naga":
+        snapshot = json.loads(parse_gdbus_string(gdbus_call("SetDpi", dpi, dpi)))
+        actual = dpi_value(snapshot.get("observed", {}).get("dpi"))
+    else:
+        identifier = ratbag_device()
+        if identifier is None:
+            raise MouseControlError("Logitech DPI control requires libratbag")
+        run(["ratbagctl", identifier, "dpi", "set", str(dpi)])
+        actual = ratbag_dpi(identifier)
+    if actual != dpi:
+        raise MouseControlError(
+            f"DPI write did not verify (reported {actual or 'unknown'})"
+        )
+    preferences = load_preferences()
+    preferences["selected"] = device_id
+    preferences["preferred_dpi"][device_id] = dpi
+    save_preferences(preferences)
+    return status_document()
+
+
+def require_device_id(device_id: str) -> None:
+    if device_id not in DEVICE_IDS:
+        raise MouseControlError("unknown mouse")
+
+
+def read_text(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+
+
+def integer_or_none(value: object) -> int | None:
+    try:
+        number = int(str(value))
+    except (TypeError, ValueError):
+        return None
+    return number
+
+
+def normalized_notification_level(value: object) -> int:
+    level = integer_or_none(value)
+    return level if level in (0, 1, 2) else 0
+
+
+def number_or_none(value: object) -> int | None:
+    try:
+        return round(float(str(value)))
+    except (TypeError, ValueError):
+        return None
+
+
+def bool_or_none(value: object) -> bool | None:
+    return value if isinstance(value, bool) else None
+
+
+def dpi_value(value: object) -> int | None:
+    if not isinstance(value, (list, tuple)) or len(value) != 2:
+        return None
+    x = integer_or_none(value[0])
+    y = integer_or_none(value[1])
+    return x if x is not None and x == y else None
+
+
+def usage() -> str:
+    return (
+        "Usage: mouse-control status | select DEVICE | set-dpi DEVICE DPI | "
+        "set-warning-threshold PERCENT"
+    )
+
+
+def main(arguments: list[str]) -> int:
+    try:
+        if arguments == ["status"]:
+            result = status_document()
+        elif len(arguments) == 2 and arguments[0] == "select":
+            select_device(arguments[1])
+            result = status_document()
+        elif len(arguments) == 3 and arguments[0] == "set-dpi":
+            result = set_dpi(arguments[1], arguments[2])
+        elif len(arguments) == 2 and arguments[0] == "set-warning-threshold":
+            set_warning_threshold(arguments[1])
+            result = status_document()
+        else:
+            print(usage(), file=sys.stderr)
+            return 2
+    except (MouseControlError, json.JSONDecodeError) as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    print(json.dumps(result, sort_keys=True, separators=(",", ":")))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))

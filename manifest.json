@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.ol4vr.mouse-control",
+  "name": "Mouse Control",
+  "version": "0.1.0",
+  "author": "Olav Rorvik",
+  "license": "MIT",
+  "description": "Unified Naga V3 Pro and PRO X Superlight status and DPI control for Hugin.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Mouse Control",
+    "description": "Mouse battery and DPI controls",
+    "category": "System",
+    "allowMultiple": false,
+    "defaultSection": "left"
+  }
+}
