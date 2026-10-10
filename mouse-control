@@ -19,10 +19,10 @@ NAGA_INTERFACE = "org.nagacontrol.Service1"
 DEVICE_IDS = ("naga", "logitech")
 DPI_MIN = 100
 DPI_MAX = 50000
-DEFAULT_WARNING_THRESHOLD = 20
-CRITICAL_THRESHOLD = 10
+PREFERENCES_SCHEMA = 2
+DEFAULT_WARNING_THRESHOLD = 15
 RECOVERY_MARGIN = 5
-WARNING_THRESHOLD_MIN = CRITICAL_THRESHOLD + 1
+WARNING_THRESHOLD_MIN = 1
 WARNING_THRESHOLD_MAX = 50
 
 
@@ -44,32 +44,43 @@ def load_preferences(path: Path | None = None) -> dict[str, Any]:
         document = json.loads(target.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return default_preferences()
-    if not isinstance(document, dict) or document.get("schema") != 1:
+    if not isinstance(document, dict) or document.get("schema") not in (1, 2):
         return default_preferences()
+    legacy = document["schema"] == 1
     selected = document.get("selected")
     preferred = document.get("preferred_dpi")
     warning_threshold = integer_or_none(document.get("warning_threshold"))
-    if warning_threshold is None or not (
-        WARNING_THRESHOLD_MIN <= warning_threshold <= WARNING_THRESHOLD_MAX
+    migrate_default = legacy and warning_threshold == 20
+    if (
+        migrate_default
+        or warning_threshold is None
+        or not (WARNING_THRESHOLD_MIN <= warning_threshold <= WARNING_THRESHOLD_MAX)
     ):
         warning_threshold = DEFAULT_WARNING_THRESHOLD
     raw_levels = document.get("notification_levels")
     raw_levels = raw_levels if isinstance(raw_levels, dict) else {}
-    return {
-        "schema": 1,
+    preferences = {
+        "schema": PREFERENCES_SCHEMA,
         "selected": selected if selected in DEVICE_IDS else "naga",
         "preferred_dpi": preferred if isinstance(preferred, dict) else {},
         "warning_threshold": warning_threshold,
         "notification_levels": {
-            device_id: normalized_notification_level(raw_levels.get(device_id))
+            device_id: (
+                0
+                if migrate_default
+                else normalized_notification_level(raw_levels.get(device_id))
+            )
             for device_id in DEVICE_IDS
         },
     }
+    if legacy:
+        save_preferences(preferences, target)
+    return preferences
 
 
 def default_preferences() -> dict[str, Any]:
     return {
-        "schema": 1,
+        "schema": PREFERENCES_SCHEMA,
         "selected": "naga",
         "preferred_dpi": {},
         "warning_threshold": DEFAULT_WARNING_THRESHOLD,
@@ -253,7 +264,6 @@ def status_document() -> dict[str, Any]:
         "schema": 1,
         "selected": preferences["selected"],
         "warning_threshold": preferences["warning_threshold"],
-        "critical_threshold": CRITICAL_THRESHOLD,
         "auto_switch": False,
         "disable_supported": False,
         "devices": devices,
@@ -302,21 +312,20 @@ def evaluate_battery_notifications(
             continue
         if device.get("charging") is True:
             continue
-        target_level = (
-            2 if battery <= CRITICAL_THRESHOLD else 1 if battery <= threshold else 0
-        )
-        if target_level > current_level and send_battery_notification(
-            device["name"], battery, target_level
+        should_warn = battery <= threshold
+        if (
+            should_warn
+            and current_level == 0
+            and send_battery_notification(device["name"], battery)
         ):
-            levels[device_id] = target_level
+            levels[device_id] = 1
             changed = True
     if changed:
         save_preferences(preferences)
 
 
-def send_battery_notification(name: str, battery: int, level: int) -> bool:
-    urgency = "critical" if level == 2 else "normal"
-    headline = f"{name} battery {'critical' if level == 2 else 'low'}"
+def send_battery_notification(name: str, battery: int) -> bool:
+    headline = f"{name} battery low"
     body = f"{name} is at {battery}%. Connect the USB charging cable."
     try:
         run(
@@ -327,7 +336,7 @@ def send_battery_notification(name: str, battery: int, level: int) -> bool:
                 "-g",
                 "󰍽",
                 "-u",
-                urgency,
+                "normal",
                 headline,
                 body,
             ]
@@ -387,7 +396,7 @@ def integer_or_none(value: object) -> int | None:
 
 def normalized_notification_level(value: object) -> int:
     level = integer_or_none(value)
-    return level if level in (0, 1, 2) else 0
+    return 1 if level in (1, 2) else 0
 
 
 def number_or_none(value: object) -> int | None:

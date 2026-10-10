@@ -8,8 +8,7 @@ const Model = require("../Model.js")
 const status = Model.parseStatus(JSON.stringify({
   schema: 1,
   selected: "naga",
-  warning_threshold: 20,
-  critical_threshold: 10,
+  warning_threshold: 15,
   auto_switch: false,
   disable_supported: false,
   devices: [
@@ -19,7 +18,7 @@ const status = Model.parseStatus(JSON.stringify({
       connected: true,
       available: true,
       connection: "hyperspeed",
-      battery: 18,
+      battery: 14,
       charging: false,
       dpi: 1800,
       preferred_dpi: 1600,
@@ -43,12 +42,15 @@ const status = Model.parseStatus(JSON.stringify({
 
 assert.ok(status)
 assert.equal(Model.selectedDevice(status).id, "naga")
-assert.equal(status.warningThreshold, 20)
-assert.equal(status.criticalThreshold, 10)
+assert.equal(status.warningThreshold, 15)
 assert.equal(Model.dpiText(Model.selectedDevice(status)), "1800 DPI")
-assert.equal(Model.batteryText(Model.selectedDevice(status)), "18%")
+assert.equal(Model.batteryText(Model.selectedDevice(status)), "14%")
 assert.equal(Model.lowBattery(Model.selectedDevice(status)), true)
 assert.equal(Model.connectionText(Model.selectedDevice(status)), "Connected · HyperSpeed")
+assert.match(
+  Model.tooltipText(Model.selectedDevice(status)),
+  /Razer Naga V3 Pro\n1800 DPI · 14%/
+)
 assert.equal(Model.deviceById(status, "logitech").dpi, null)
 assert.equal(Model.dpiText(Model.deviceById(status, "logitech")), "DPI unavailable")
 assert.equal(Model.lowBattery(Model.deviceById(status, "logitech")), false)

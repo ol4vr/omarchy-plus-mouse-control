@@ -129,7 +129,7 @@ class MouseControlTests(unittest.TestCase):
             mouse_control.set_dpi("naga", "99")
         call.assert_not_called()
 
-    def test_warning_is_latched_then_escalates_once_at_critical(self) -> None:
+    def test_warning_is_sent_once_at_fifteen_percent(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "preferences.json"
             with (
@@ -140,27 +140,18 @@ class MouseControlTests(unittest.TestCase):
             ):
                 preferences = mouse_control.default_preferences()
                 mouse_control.evaluate_battery_notifications(
-                    [battery_device("naga", 20)], preferences
+                    [battery_device("naga", 15)], preferences
                 )
                 mouse_control.evaluate_battery_notifications(
-                    [battery_device("naga", 20)], preferences
-                )
-                mouse_control.evaluate_battery_notifications(
-                    [battery_device("naga", 10)], preferences
+                    [battery_device("naga", 15)], preferences
                 )
                 mouse_control.evaluate_battery_notifications(
                     [battery_device("naga", 9)], preferences
                 )
 
-            self.assertEqual(
-                send.call_args_list,
-                [
-                    unittest.mock.call("Razer Naga V3 Pro", 20, 1),
-                    unittest.mock.call("Razer Naga V3 Pro", 10, 2),
-                ],
-            )
+            send.assert_called_once_with("Razer Naga V3 Pro", 15)
             saved = json.loads(path.read_text(encoding="utf-8"))
-            self.assertEqual(saved["notification_levels"], {"logitech": 0, "naga": 2})
+            self.assertEqual(saved["notification_levels"], {"logitech": 0, "naga": 1})
 
     def test_notification_state_is_independent_for_each_mouse(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -173,7 +164,7 @@ class MouseControlTests(unittest.TestCase):
             ):
                 preferences = mouse_control.default_preferences()
                 mouse_control.evaluate_battery_notifications(
-                    [battery_device("naga", 20), battery_device("logitech", 20)],
+                    [battery_device("naga", 15), battery_device("logitech", 15)],
                     preferences,
                 )
 
@@ -211,13 +202,13 @@ class MouseControlTests(unittest.TestCase):
             ):
                 preferences = mouse_control.default_preferences()
                 mouse_control.evaluate_battery_notifications(
-                    [battery_device("naga", 20)], preferences
+                    [battery_device("naga", 15)], preferences
                 )
                 mouse_control.evaluate_battery_notifications(
-                    [battery_device("naga", 25, charging=True)], preferences
+                    [battery_device("naga", 20, charging=True)], preferences
                 )
                 mouse_control.evaluate_battery_notifications(
-                    [battery_device("naga", 20)], preferences
+                    [battery_device("naga", 15)], preferences
                 )
 
             self.assertEqual(send.call_count, 2)
@@ -225,24 +216,51 @@ class MouseControlTests(unittest.TestCase):
     def test_notification_uses_omarchy_swaync_path_and_cable_reminder(self) -> None:
         with patch.object(mouse_control, "run", return_value="") as run:
             sent = mouse_control.send_battery_notification(
-                "Logitech PRO X Superlight", 10, 2
+                "Logitech PRO X Superlight", 15
             )
 
         self.assertTrue(sent)
         arguments = run.call_args.args[0]
         self.assertEqual(arguments[0], "omarchy-notification-send")
-        self.assertIn("critical", arguments)
-        self.assertIn("Logitech PRO X Superlight battery critical", arguments)
+        self.assertIn("normal", arguments)
+        self.assertIn("Logitech PRO X Superlight battery low", arguments)
         self.assertIn(
-            "Logitech PRO X Superlight is at 10%. Connect the USB charging cable.",
+            "Logitech PRO X Superlight is at 15%. Connect the USB charging cable.",
             arguments,
         )
+
+    def test_legacy_twenty_percent_default_migrates_to_fifteen(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "preferences.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "schema": 1,
+                        "selected": "logitech",
+                        "preferred_dpi": {"naga": 1800},
+                        "warning_threshold": 20,
+                        "notification_levels": {"naga": 2, "logitech": 1},
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            preferences = mouse_control.load_preferences(path)
+
+            self.assertEqual(preferences["schema"], 2)
+            self.assertEqual(preferences["selected"], "logitech")
+            self.assertEqual(preferences["preferred_dpi"], {"naga": 1800})
+            self.assertEqual(preferences["warning_threshold"], 15)
+            self.assertEqual(
+                preferences["notification_levels"], {"naga": 0, "logitech": 0}
+            )
+            self.assertEqual(json.loads(path.read_text(encoding="utf-8")), preferences)
 
     def test_warning_threshold_setting_persists_and_rearms_both_mice(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "preferences.json"
             preferences = mouse_control.default_preferences()
-            preferences["notification_levels"] = {"naga": 2, "logitech": 1}
+            preferences["notification_levels"] = {"naga": 1, "logitech": 1}
             mouse_control.save_preferences(preferences, path)
             with patch.dict(os.environ, {"MOUSE_CONTROL_STATE_PATH": str(path)}):
                 mouse_control.set_warning_threshold("25")
@@ -252,9 +270,9 @@ class MouseControlTests(unittest.TestCase):
             self.assertEqual(saved["notification_levels"], {"logitech": 0, "naga": 0})
 
             with self.assertRaisesRegex(
-                mouse_control.MouseControlError, "from 11 through 50"
+                mouse_control.MouseControlError, "from 1 through 50"
             ):
-                mouse_control.set_warning_threshold("10")
+                mouse_control.set_warning_threshold("0")
 
 
 if __name__ == "__main__":

@@ -20,6 +20,7 @@ BarWidget {
   readonly property bool busy: statusProc.running || actionProc.running
 
   readonly property var activeDevice: Model.selectedDevice(status)
+  readonly property int warningThreshold: status ? status.warningThreshold : 15
   readonly property color primaryColor: bar ? bar.barForeground : Color.foreground
   readonly property bool opened: panelLoader.item ? panelLoader.item.opened === true : false
   readonly property bool popoutSwitchClosing: panelLoader.item
@@ -138,12 +139,11 @@ BarWidget {
     horizontalMargin: 3
     text: {
       if (!root.activeDevice) return "󰍽 …"
-      var dpi = root.activeDevice.dpi === null ? "—" : root.activeDevice.dpi
       var battery = root.activeDevice.battery === null ? "—" : root.activeDevice.battery + "%"
-      return "󰍽 " + dpi + " 󰁹 " + battery
+      return "󰍽 " + battery
     }
     foreground: root.primaryColor
-    active: Model.lowBattery(root.activeDevice)
+    active: Model.lowBattery(root.activeDevice, root.warningThreshold)
     activeColor: Color.urgent
     tooltipText: Model.tooltipText(root.activeDevice)
     onPressed: function(buttonCode) {

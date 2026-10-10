@@ -38,8 +38,7 @@ function parseStatus(raw) {
   if (devices.length !== 2) return null
   return {
     selected: document.selected === "logitech" ? "logitech" : "naga",
-    warningThreshold: finiteInteger(document.warning_threshold) || 20,
-    criticalThreshold: finiteInteger(document.critical_threshold) || 10,
+    warningThreshold: finiteInteger(document.warning_threshold) || 15,
     devices: devices
   }
 }
@@ -63,8 +62,10 @@ function batteryText(device) {
   return device && device.battery !== null ? device.battery + "%" : "Battery unavailable"
 }
 
-function lowBattery(device) {
-  return !!device && device.battery !== null && device.battery <= 20 && device.charging !== true
+function lowBattery(device, warningThreshold) {
+  var threshold = finiteInteger(warningThreshold) || 15
+  return !!device && device.battery !== null && device.battery <= threshold
+    && device.charging !== true
 }
 
 function connectionText(device) {

@@ -15,9 +15,10 @@ test("manifest identifies the owned left-bar widget", () => {
   assert.deepEqual(manifest.kinds, ["bar-widget"])
 })
 
-test("bar presents selected DPI and battery and owns the popup lifecycle", () => {
-  assert.match(bar, /activeDevice\.dpi/)
+test("bar presents only the selected battery beside the mouse icon", () => {
   assert.match(bar, /activeDevice\.battery/)
+  assert.match(bar, /return "󰍽 " \+ battery/)
+  assert.doesNotMatch(bar, /var dpi|activeDevice\.dpi/)
   assert.match(bar, /source: Qt\.resolvedUrl\("Panel\.qml"\)/)
   assert.match(bar, /interval: 5000/)
 })
@@ -29,11 +30,18 @@ test("popup offers manual device selection and explicit DPI presets", () => {
   assert.doesNotMatch(panel, /\bRGB\b|lighting|button mapping/i)
 })
 
-test("popup exposes the persisted low-battery warning threshold", () => {
+test("popup presents the persisted warning threshold as compact status", () => {
   assert.match(panel, /LOW-BATTERY WARNING/)
-  assert.match(panel, /\[15, 20, 25\]/)
-  assert.match(panel, /set-warning-threshold/)
-  assert.match(panel, /Critical notification: 10%/)
+  assert.match(panel, /Notify once at or below/)
+  assert.match(panel, /warningThreshold \+ "%"/)
+  assert.doesNotMatch(panel, /\[15, 20, 25\]/)
+  assert.doesNotMatch(panel, /Critical notification/)
+})
+
+test("popup keeps balanced content insets and selected-device emphasis", () => {
+  assert.match(panel, /anchors\.leftMargin: Style\.space\(16\)/)
+  assert.match(panel, /anchors\.rightMargin: Style\.space\(16\)/)
+  assert.match(panel, /SELECTED DEVICE/)
 })
 
 test("helper has no input monitor, RGB path, or mouse-disable operation", () => {

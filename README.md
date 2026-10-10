@@ -9,6 +9,8 @@ placement is the left bar immediately after `io.github.ol4vr.openrgb-presets`.
 
 ## Current behavior
 
+- Keeps the bar compact with only the mouse icon and selected-device battery;
+  the hover tooltip and popup retain the device name, DPI, and battery details.
 - Shows the manually selected mouse, connection state, current DPI when the
   backend can read it, battery percentage, and charging state when reported.
 - Provides 800, 1200, 1600, 1800, 2400, and 3200 DPI presets. A write occurs
@@ -16,14 +18,15 @@ placement is the left bar immediately after `io.github.ol4vr.openrgb-presets`.
 - Stores the selected mouse and last successfully verified DPI per device in
   `${XDG_STATE_HOME:-~/.local/state}/omarchy-plus/mouse-control/preferences.json`.
 - Sends one normal-urgency warning when either mouse reaches the configured
-  warning threshold (20% by default), then one critical warning if it reaches
-  10%. Each notification names the mouse and percentage and asks the owner to
-  connect the USB charging cable.
+  warning threshold (15% by default). Each notification names the mouse and
+  percentage and asks the owner to connect the USB charging cable; there is no
+  separate critical alert.
 - Suppresses battery warnings while charging, tracks the warning latch
   independently for each mouse, and rearms it only after charge reaches five
-  points above the warning threshold. Missing battery data never
-  produces a notification. The popup can select a 15%, 20%, or 25% warning;
-  the critical threshold remains 10%.
+  points above the warning threshold. Missing battery data never produces a
+  notification. The popup shows the current threshold as compact status; the
+  helper's existing `set-warning-threshold` command remains available for a
+  deliberate adjustment.
 - Marks unavailable values as unavailable; it never fabricates DPI, battery,
   charging, or connection state.
 - Does not edit button mappings, Naga profiles, RGB, polling rate, firmware,
@@ -46,6 +49,11 @@ Low-battery notifications use Omarchy's existing
 That command delivers through the desktop notification interface used by
 SwayNC. Mouse Control does not start a notification daemon or add another
 polling process.
+
+Preference schema 2 deliberately migrates the previous schema-1 default of
+20% to 15%, preserving device selection and preferred DPI values while
+rearming both per-device warning latches. Other valid explicitly stored
+thresholds are retained during migration.
 
 ## Backends
 

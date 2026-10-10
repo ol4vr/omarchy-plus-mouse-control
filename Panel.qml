@@ -14,7 +14,7 @@ Panel {
   readonly property var barIdentity: hostWidget || root
   readonly property var status: hostWidget ? hostWidget.status : null
   readonly property var activeDevice: Model.selectedDevice(status)
-  readonly property int warningThreshold: status ? status.warningThreshold : 20
+  readonly property int warningThreshold: status ? status.warningThreshold : 15
   readonly property color foreground: bar ? bar.foreground : Color.foreground
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
   readonly property var presets: [800, 1200, 1600, 1800, 2400, 3200]
@@ -53,11 +53,6 @@ Panel {
       hostWidget.runAction(["set-dpi", activeDevice.id, String(value)])
   }
 
-  function setWarningThreshold(value) {
-    if (hostWidget)
-      hostWidget.runAction(["set-warning-threshold", String(value)])
-  }
-
   KeyboardPanel {
     id: panel
     anchorItem: root.anchorItem
@@ -76,7 +71,10 @@ Panel {
 
       Column {
         id: content
-        width: parent.width
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.leftMargin: Style.space(16)
+        anchors.rightMargin: Style.space(16)
         spacing: Style.spacing.lg
 
         Row {
@@ -86,7 +84,8 @@ Panel {
           Text {
             anchors.verticalCenter: parent.verticalCenter
             text: "󰍽"
-            color: Model.lowBattery(root.activeDevice) ? Color.urgent : Color.accent
+            color: Model.lowBattery(root.activeDevice, root.warningThreshold)
+              ? Color.urgent : Color.accent
             font.family: root.fontFamily
             font.pixelSize: Style.font.heading
           }
@@ -140,16 +139,24 @@ Panel {
 
         Rectangle {
           width: parent.width
-          height: Style.space(112)
+          height: Style.space(132)
           radius: Style.cornerRadius
-          color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.06)
+          color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.08)
           border.width: 1
-          border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.18)
+          border.color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.42)
 
           Column {
             anchors.fill: parent
             anchors.margins: Style.space(14)
             spacing: Style.space(5)
+
+            Text {
+              text: "SELECTED DEVICE"
+              color: Color.accent
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.caption
+              font.bold: true
+            }
 
             Text {
               width: parent.width
@@ -172,7 +179,8 @@ Panel {
             Text {
               text: Model.batteryText(root.activeDevice)
                 + (root.activeDevice && root.activeDevice.charging === true ? " · Charging" : "")
-              color: Model.lowBattery(root.activeDevice) ? Color.urgent : root.foreground
+              color: Model.lowBattery(root.activeDevice, root.warningThreshold)
+                ? Color.urgent : root.foreground
               font.family: root.fontFamily
               font.pixelSize: Style.font.bodySmall
             }
@@ -230,33 +238,43 @@ Panel {
             foreground: root.foreground
           }
 
-          Row {
+          Rectangle {
             width: parent.width
-            spacing: Style.space(8)
+            height: Style.space(44)
+            radius: Style.cornerRadius
+            color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.05)
+            border.width: 1
+            border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.14)
 
-            Repeater {
-              model: [15, 20, 25]
+            Row {
+              anchors.fill: parent
+              anchors.leftMargin: Style.space(12)
+              anchors.rightMargin: Style.space(12)
 
-              Button {
-                required property int modelData
-                width: (content.width - Style.space(16)) / 3
-                text: modelData + "%"
-                fontFamily: root.fontFamily
-                foreground: root.foreground
-                accent: Color.accent
-                selected: root.warningThreshold === modelData
-                enabled: hostWidget && !hostWidget.busy
-                onClicked: root.setWarningThreshold(modelData)
+              Text {
+                id: warningLabel
+                anchors.verticalCenter: parent.verticalCenter
+                text: "Notify once at or below"
+                color: root.foreground
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.bodySmall
+              }
+
+              Item {
+                width: parent.width - warningLabel.implicitWidth - warningValue.implicitWidth
+                height: 1
+              }
+
+              Text {
+                id: warningValue
+                anchors.verticalCenter: parent.verticalCenter
+                text: root.warningThreshold + "%"
+                color: Color.accent
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.body
+                font.bold: true
               }
             }
-          }
-
-          Text {
-            width: parent.width
-            text: "Critical notification: 10%"
-            color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.62)
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.caption
           }
         }
 
