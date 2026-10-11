@@ -35,7 +35,7 @@ const status = Model.parseStatus(JSON.stringify({
       dpi: null,
       preferred_dpi: null,
       dpi_write: false,
-      error: "DPI control requires libratbag"
+      error: "Wireless DPI control unavailable (libratbag)"
     }
   ]
 }))
@@ -46,7 +46,15 @@ assert.equal(status.warningThreshold, 15)
 assert.equal(Model.dpiText(Model.selectedDevice(status)), "1800 DPI")
 assert.equal(Model.batteryText(Model.selectedDevice(status)), "14%")
 assert.equal(Model.batteryWarning(Model.selectedDevice(status)), true)
-assert.equal(Model.connectionText(Model.selectedDevice(status)), "Connected · HyperSpeed")
+assert.equal(
+  Model.connectionText(Model.selectedDevice(status)),
+  "Connected · 2.4 GHz HyperSpeed"
+)
+assert.equal(Model.connectionText({
+  connected: true,
+  available: true,
+  connection: "wired"
+}), "Connected · Wired")
 assert.match(
   Model.tooltipText(Model.selectedDevice(status)),
   /Razer Naga V3 Pro\n1800 DPI · 14%/

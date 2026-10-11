@@ -54,15 +54,16 @@ Panel {
   }
 
   function chargingText(device) {
-    if (!device || device.charging === null) return "Unavailable"
-    return device.charging ? "Charging" : "Not charging"
+    if (!device || device.charging === null) return "Charging Unknown"
+    return device.charging ? "Charging" : "Not Charging"
   }
 
   function connectionTypeText(device) {
     if (!device || !device.connected) return "Disconnected"
     if (!device.available) return "Control unavailable"
-    if (device.connection === "hyperspeed") return "HyperSpeed"
-    if (device.connection === "lightspeed") return "LIGHTSPEED"
+    if (device.connection === "hyperspeed") return "2.4 GHz HyperSpeed"
+    if (device.connection === "lightspeed") return "2.4 GHz Lightspeed"
+    if (device.connection === "usb" || device.connection === "wired") return "Wired"
     return device.connection !== "unavailable" ? device.connection : "Connected"
   }
 

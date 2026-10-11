@@ -70,8 +70,10 @@ function batteryWarning(device, warningThreshold) {
 function connectionText(device) {
   if (!device || !device.connected) return "Disconnected"
   if (!device.available) return "Connected · control unavailable"
-  var value = device.connection === "hyperspeed" ? "HyperSpeed" :
-    device.connection === "lightspeed" ? "LIGHTSPEED" : device.connection
+  var value = device.connection === "hyperspeed" ? "2.4 GHz HyperSpeed" :
+    device.connection === "lightspeed" ? "2.4 GHz Lightspeed" :
+    device.connection === "usb" || device.connection === "wired" ? "Wired" :
+    device.connection
   return "Connected · " + value
 }
 

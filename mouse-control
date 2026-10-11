@@ -224,7 +224,7 @@ def logitech_status(preferred: object = None) -> dict[str, Any]:
     try:
         identifier = ratbag_device()
         if identifier is None:
-            device["error"] = "DPI control requires libratbag"
+            device["error"] = "Wireless DPI control unavailable (libratbag)"
             return device
         device["dpi"] = ratbag_dpi(identifier)
         device["dpi_write"] = device["dpi"] is not None

@@ -73,7 +73,32 @@ class MouseControlTests(unittest.TestCase):
         self.assertIsNone(device["charging"])
         self.assertIsNone(device["dpi"])
         self.assertFalse(device["dpi_write"])
-        self.assertEqual(device["error"], "DPI control requires libratbag")
+        self.assertEqual(
+            device["error"], "Wireless DPI control unavailable (libratbag)"
+        )
+
+    def test_packaged_ratbag_device_exposes_wired_logitech_dpi(self) -> None:
+        def ratbag_output(arguments: list[str]) -> str:
+            if arguments == ["ratbagctl", "list"]:
+                return "warbling-mara: Logitech PRO X Superlight"
+            if arguments == ["ratbagctl", "warbling-mara", "dpi", "get"]:
+                return "1600dpi"
+            self.fail(f"unexpected ratbag command: {arguments}")
+
+        with (
+            patch.object(
+                mouse_control, "power_supply_status", return_value=(True, 60, None)
+            ),
+            patch.object(
+                mouse_control.shutil, "which", return_value="/usr/bin/ratbagctl"
+            ),
+            patch.object(mouse_control, "run", side_effect=ratbag_output),
+        ):
+            device = mouse_control.logitech_status()
+
+        self.assertEqual(device["dpi"], 1600)
+        self.assertTrue(device["dpi_write"])
+        self.assertIsNone(device["error"])
 
     def test_explicit_naga_dpi_write_persists_only_after_verification(self) -> None:
         snapshot = {"status": "available", "observed": {"dpi": [1800, 1800]}}
