@@ -65,6 +65,7 @@ class MouseControlTests(unittest.TestCase):
             patch.object(
                 mouse_control, "power_supply_status", return_value=(True, 60, None)
             ),
+            patch.object(mouse_control, "logitech_wired_connected", return_value=False),
             patch.object(mouse_control.shutil, "which", return_value=None),
         ):
             device = mouse_control.logitech_status()
@@ -81,7 +82,14 @@ class MouseControlTests(unittest.TestCase):
         def ratbag_output(arguments: list[str]) -> str:
             if arguments == ["ratbagctl", "list"]:
                 return "warbling-mara: Logitech PRO X Superlight"
-            if arguments == ["ratbagctl", "warbling-mara", "dpi", "get"]:
+            if arguments == [
+                "ratbagctl",
+                "warbling-mara",
+                "profile",
+                "0",
+                "dpi",
+                "get",
+            ]:
                 return "1600dpi"
             self.fail(f"unexpected ratbag command: {arguments}")
 
@@ -89,6 +97,7 @@ class MouseControlTests(unittest.TestCase):
             patch.object(
                 mouse_control, "power_supply_status", return_value=(True, 60, None)
             ),
+            patch.object(mouse_control, "logitech_wired_connected", return_value=True),
             patch.object(
                 mouse_control.shutil, "which", return_value="/usr/bin/ratbagctl"
             ),
@@ -98,7 +107,38 @@ class MouseControlTests(unittest.TestCase):
 
         self.assertEqual(device["dpi"], 1600)
         self.assertTrue(device["dpi_write"])
+        self.assertEqual(device["connection"], "wired")
         self.assertIsNone(device["error"])
+
+    def test_wired_usb_identity_takes_precedence_over_receiver_telemetry(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            usb_devices = Path(directory)
+            receiver = usb_devices / "1-2"
+            receiver.mkdir()
+            (receiver / "idVendor").write_text("046d\n", encoding="utf-8")
+            (receiver / "idProduct").write_text("c547\n", encoding="utf-8")
+            wired = usb_devices / "1-8"
+            wired.mkdir()
+            (wired / "idVendor").write_text("046d\n", encoding="utf-8")
+            (wired / "idProduct").write_text("c094\n", encoding="utf-8")
+
+            self.assertTrue(mouse_control.logitech_wired_connected(usb_devices))
+
+    def test_receiver_without_wired_usb_remains_lightspeed(self) -> None:
+        with (
+            patch.object(
+                mouse_control, "power_supply_status", return_value=(True, 60, None)
+            ),
+            patch.object(mouse_control, "logitech_wired_connected", return_value=False),
+            patch.object(mouse_control, "ratbag_device", return_value=None),
+        ):
+            device = mouse_control.logitech_status()
+
+        self.assertEqual(device["connection"], "lightspeed")
+        self.assertFalse(device["dpi_write"])
+        self.assertEqual(
+            device["error"], "Wireless DPI control unavailable (libratbag)"
+        )
 
     def test_explicit_naga_dpi_write_persists_only_after_verification(self) -> None:
         snapshot = {"status": "available", "observed": {"dpi": [1800, 1800]}}
@@ -139,7 +179,15 @@ class MouseControlTests(unittest.TestCase):
                 mouse_control.set_dpi("logitech", "1200")
 
             run.assert_called_once_with(
-                ["ratbagctl", "warbling-mara", "dpi", "set", "1200"]
+                [
+                    "ratbagctl",
+                    "warbling-mara",
+                    "profile",
+                    "0",
+                    "dpi",
+                    "set",
+                    "1200",
+                ]
             )
             saved = json.loads(path.read_text(encoding="utf-8"))
             self.assertEqual(saved["preferred_dpi"], {"logitech": 1200})

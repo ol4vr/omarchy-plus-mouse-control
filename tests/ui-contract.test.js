@@ -11,7 +11,7 @@ const helper = fs.readFileSync(path.join(root, "mouse-control"), "utf8")
 
 test("manifest identifies the owned left-bar widget", () => {
   assert.equal(manifest.id, "io.github.ol4vr.mouse-control")
-  assert.equal(manifest.version, "0.2.6")
+  assert.equal(manifest.version, "0.2.7")
   assert.equal(manifest.barWidget.defaultSection, "left")
   assert.deepEqual(manifest.kinds, ["bar-widget"])
 })

@@ -17,6 +17,8 @@ NAGA_BUS = "org.nagacontrol.Service1"
 NAGA_PATH = "/org/nagacontrol/Service1"
 NAGA_INTERFACE = "org.nagacontrol.Service1"
 DEVICE_IDS = ("naga", "logitech")
+LOGITECH_WIRED_USB_ID = ("046d", "c094")
+RATBAG_LOGITECH_PROFILE = "0"
 DPI_MIN = 100
 DPI_MAX = 50000
 PREFERENCES_SCHEMA = 2
@@ -190,6 +192,23 @@ def power_supply_status() -> tuple[bool, int | None, bool | None]:
     return False, None, None
 
 
+def logitech_wired_connected(
+    usb_devices: Path = Path("/sys/bus/usb/devices"),
+) -> bool:
+    try:
+        devices = list(usb_devices.iterdir())
+    except OSError:
+        return False
+    for device in devices:
+        identity = (
+            read_text(device / "idVendor").lower(),
+            read_text(device / "idProduct").lower(),
+        )
+        if identity == LOGITECH_WIRED_USB_ID:
+            return True
+    return False
+
+
 def ratbag_device() -> str | None:
     if shutil.which("ratbagctl") is None:
         return None
@@ -204,18 +223,24 @@ def ratbag_device() -> str | None:
 
 
 def ratbag_dpi(identifier: str) -> int | None:
-    output = run(["ratbagctl", identifier, "dpi", "get"])
+    output = run(
+        ["ratbagctl", identifier, "profile", RATBAG_LOGITECH_PROFILE, "dpi", "get"]
+    )
     match = re.search(r"\b([0-9]+)(?:x[0-9]+)?dpi\b", output, re.IGNORECASE)
     return int(match.group(1)) if match else None
 
 
 def logitech_status(preferred: object = None) -> dict[str, Any]:
-    connected, battery, charging = power_supply_status()
+    telemetry_connected, battery, charging = power_supply_status()
+    wired = logitech_wired_connected()
+    connected = telemetry_connected or wired
     device = base_device("logitech", "Logitech PRO X Superlight", preferred)
     device.update(
         connected=connected,
         available=connected,
-        connection="lightspeed" if connected else "unavailable",
+        connection=(
+            "wired" if wired else "lightspeed" if telemetry_connected else "unavailable"
+        ),
         battery=battery,
         charging=charging,
     )
@@ -224,7 +249,11 @@ def logitech_status(preferred: object = None) -> dict[str, Any]:
     try:
         identifier = ratbag_device()
         if identifier is None:
-            device["error"] = "Wireless DPI control unavailable (libratbag)"
+            device["error"] = (
+                "Wired DPI control unavailable (libratbag)"
+                if wired
+                else "Wireless DPI control unavailable (libratbag)"
+            )
             return device
         device["dpi"] = ratbag_dpi(identifier)
         device["dpi_write"] = device["dpi"] is not None
@@ -361,7 +390,17 @@ def set_dpi(device_id: str, raw_dpi: str) -> dict[str, Any]:
         identifier = ratbag_device()
         if identifier is None:
             raise MouseControlError("Logitech DPI control requires libratbag")
-        run(["ratbagctl", identifier, "dpi", "set", str(dpi)])
+        run(
+            [
+                "ratbagctl",
+                identifier,
+                "profile",
+                RATBAG_LOGITECH_PROFILE,
+                "dpi",
+                "set",
+                str(dpi),
+            ]
+        )
         actual = ratbag_dpi(identifier)
     if actual != dpi:
         raise MouseControlError(

@@ -81,13 +81,22 @@ matched as wired `046d:c094`). The Hugin receiver presents the supported
 `046d:4093` child device even though its USB receiver itself is `046d:c547`.
 
 Hugin uses Arch's packaged `libratbag` 0.18-1. The wired `046d:c094` device is
-discovered by `ratbagctl`, and the existing backend exposes its reported DPI and
-the six presets without a compatibility shim. Over the `046d:c547` LIGHTSPEED
-receiver, the kernel exposes the `046d:4093` mouse but libratbag does not
-enumerate a configurable device, so wireless DPI control remains unavailable.
-Connect the USB cable when DPI configuration is needed, then return to
-LIGHTSPEED; battery and connection telemetry remain available wirelessly. Do
-not add Piper, Solaar, a custom driver, udev rule, or service for this limitation.
+discovered by `ratbagctl`; Mouse Control recognizes that exact USB identity and
+prefers Wired when receiver telemetry is also present. Over the `046d:c547`
+LIGHTSPEED receiver, the kernel exposes the `046d:4093` mouse but libratbag does
+not enumerate a configurable device, so wireless DPI control remains
+unavailable.
+
+For the wired mouse, libratbag reports disabled Profile 1 as active even though
+Profile 0 owns the usable DPI stages and active resolution. Mouse Control reads,
+writes, and verifies Profile 0's active resolution explicitly without changing
+the active profile or enabling or disabling any profile. This avoids accepting
+a readback from the unusable Profile 1. A controlled Hugin test confirmed that
+the Profile 0 write changes physical pointer sensitivity; the owner selected
+1000 DPI for everyday use. Upstream libratbag still has related reports where a
+successful stage readback does not change pointer sensitivity on other devices.
+Do not add Piper, Solaar, a custom driver, udev rule, or service for this
+limitation.
 
 ## Validation
 
