@@ -62,10 +62,20 @@ assert.match(
 assert.equal(Model.deviceById(status, "logitech").dpi, null)
 assert.equal(Model.dpiText(Model.deviceById(status, "logitech")), "DPI unavailable")
 assert.equal(Model.batteryWarning(Model.deviceById(status, "logitech")), false)
+assert.equal(Model.chargingIndicatorVisible(Model.selectedDevice(status)), false)
+assert.equal(Model.chargingIndicatorVisible(Model.deviceById(status, "logitech")), false)
+assert.equal(Model.chargingIndicatorVisible(null), false)
 status.devices[0].battery = 15
 assert.equal(Model.batteryWarning(Model.selectedDevice(status)), true)
 status.devices[0].charging = true
 assert.equal(Model.batteryWarning(Model.selectedDevice(status)), true)
+assert.equal(Model.chargingIndicatorVisible(Model.selectedDevice(status)), true)
+status.devices[0].available = false
+assert.equal(Model.chargingIndicatorVisible(Model.selectedDevice(status)), false)
+status.devices[0].available = true
+status.devices[0].charging = null
+assert.equal(Model.chargingIndicatorVisible(Model.selectedDevice(status)), false)
+status.devices[0].charging = false
 status.devices[0].battery = 16
 assert.equal(Model.batteryWarning(Model.selectedDevice(status)), false)
 assert.equal(Model.parseStatus("not json"), null)

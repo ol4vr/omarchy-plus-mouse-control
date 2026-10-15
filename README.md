@@ -9,7 +9,8 @@ placement is the left bar immediately after `io.github.ol4vr.openrgb-presets`.
 
 ## Current behavior
 
-- Keeps the bar compact with only the mouse icon and selected-device battery;
+- Keeps the bar compact with the mouse icon and selected-device battery, plus
+  a small theme-success lightning bolt only while charging is explicitly true;
   the hover tooltip and popup retain the device name, DPI, and battery details.
 - Shows the manually selected mouse, connection state, current DPI when the
   backend can read it, battery percentage, and charging state when reported.

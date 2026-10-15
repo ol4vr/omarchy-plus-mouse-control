@@ -67,6 +67,10 @@ function batteryWarning(device, warningThreshold) {
   return !!device && device.battery !== null && device.battery <= threshold
 }
 
+function chargingIndicatorVisible(device) {
+  return !!device && device.available === true && device.charging === true
+}
+
 function connectionText(device) {
   if (!device || !device.connected) return "Disconnected"
   if (!device.available) return "Connected · control unavailable"
@@ -97,6 +101,7 @@ if (typeof module !== "undefined") {
     dpiText: dpiText,
     batteryText: batteryText,
     batteryWarning: batteryWarning,
+    chargingIndicatorVisible: chargingIndicatorVisible,
     connectionText: connectionText,
     tooltipText: tooltipText
   }

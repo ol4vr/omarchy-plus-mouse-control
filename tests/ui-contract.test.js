@@ -11,16 +11,24 @@ const helper = fs.readFileSync(path.join(root, "mouse-control"), "utf8")
 
 test("manifest identifies the owned left-bar widget", () => {
   assert.equal(manifest.id, "io.github.ol4vr.mouse-control")
-  assert.equal(manifest.version, "0.2.7")
+  assert.equal(manifest.version, "0.2.8")
   assert.equal(manifest.barWidget.defaultSection, "left")
   assert.deepEqual(manifest.kinds, ["bar-widget"])
 })
 
-test("bar presents only the selected battery beside the mouse icon", () => {
+test("bar presents the selected battery and strict charging indicator", () => {
   assert.match(bar, /activeDevice\.battery/)
   assert.doesNotMatch(bar, /var dpi|activeDevice\.dpi/)
   assert.match(bar, /leadingGap: Style\.spaceReal\(8\)/)
   assert.match(bar, /text: "󰍽"\s+color: button\.foreground/)
+  assert.match(bar, /id: chargingIndicator/)
+  assert.match(bar, /visible: Model\.chargingIndicatorVisible\(root\.activeDevice\)/)
+  assert.match(helper, /charging=charging/)
+  assert.match(bar, /text: ""\s+color: root\.successColor/)
+  assert.match(bar, /font\.pixelSize: Style\.font\.iconSmall/)
+  assert.match(bar, /spacing: Style\.space\(1\)/)
+  assert.match(bar, /green\\s\*=\\s\*\["'\]\?/)
+  assert.doesNotMatch(bar, /chargingIndicator[\s\S]{0,300}Color\.accent/)
   assert.match(bar, /color: root\.batteryWarning \? Color\.urgent : button\.foreground/)
   assert.match(bar, /batteryWarning: Model\.batteryWarning\(activeDevice, warningThreshold\)/)
   assert.match(bar, /source: Qt\.resolvedUrl\("Panel\.qml"\)/)

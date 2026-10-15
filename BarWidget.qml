@@ -16,12 +16,16 @@ BarWidget {
   property string processError: ""
   property var pendingCommand: []
   property bool loaded: false
+  property color successColor: Color.foreground
   readonly property bool actionRunning: actionProc.running
   readonly property bool busy: statusProc.running || actionProc.running
 
   readonly property var activeDevice: Model.selectedDevice(status)
   readonly property int warningThreshold: status ? status.warningThreshold : 15
   readonly property color primaryColor: bar ? bar.barForeground : Color.foreground
+  readonly property color themeRevision: Color.accent
+  readonly property string themeColorsPath: Quickshell.env("HOME")
+    + "/.local/state/omarchy/current/theme/colors.toml"
   readonly property real leadingGap: Style.spaceReal(8)
   readonly property string batteryLabel: !activeDevice ? "…"
     : activeDevice.battery === null ? "—" : activeDevice.battery + "%"
@@ -43,6 +47,11 @@ BarWidget {
     status = parsed
     loaded = true
     processError = ""
+  }
+
+  function acceptThemeColors(raw) {
+    var match = String(raw || "").match(/^\s*green\s*=\s*["']?(#[0-9A-Fa-f]{6})["']?\s*$/m)
+    successColor = match ? match[1] : Color.foreground
   }
 
   function runAction(arguments) {
@@ -81,6 +90,17 @@ BarWidget {
   implicitWidth: button.implicitWidth + leadingGap
   implicitHeight: button.implicitHeight
   onBarChanged: injectPanel()
+  onThemeRevisionChanged: themeColorsFile.reload()
+
+  FileView {
+    id: themeColorsFile
+    path: root.themeColorsPath
+    watchChanges: true
+    printErrors: false
+    onLoaded: root.acceptThemeColors(text())
+    onFileChanged: reload()
+    onLoadFailed: root.successColor = Color.foreground
+  }
 
   Process {
     id: statusProc
@@ -155,12 +175,26 @@ BarWidget {
       anchors.centerIn: parent
       spacing: Style.space(4)
 
-      Text {
-        text: "󰍽"
-        color: button.foreground
-        font.family: button.fontFamily
-        font.pixelSize: button.fontSize
-        renderType: Text.NativeRendering
+      Row {
+        spacing: Style.space(1)
+
+        Text {
+          text: "󰍽"
+          color: button.foreground
+          font.family: button.fontFamily
+          font.pixelSize: button.fontSize
+          renderType: Text.NativeRendering
+        }
+
+        Text {
+          id: chargingIndicator
+          visible: Model.chargingIndicatorVisible(root.activeDevice)
+          text: ""
+          color: root.successColor
+          font.family: button.fontFamily
+          font.pixelSize: Style.font.iconSmall
+          renderType: Text.NativeRendering
+        }
       }
 
       Text {
